@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from torchvision.transforms import functional as TF
+from PIL import Image, ImageDraw
+import numpy as np
 
 
 def polygon_area(poly):
@@ -85,7 +87,7 @@ class DBProcessor:
         outer_polygons = []
         inner_polygons = []
         for box in boxes:
-            x1, y1, x2, y2 = boxes[:4]
+            x1, y1, x2, y2 = box[:4]
             x1 = x1 / 1000 * width
             x2 = x2 / 1000 * width
             y1 = y1 / 1000 * height
@@ -98,8 +100,8 @@ class DBProcessor:
             distance = area * (1 - self.expand_ratio ** 2) / length
 
             polygon = [(x1, y1), (x1, y2), (x2, y2), (x2, y1)]
-            outer_polygon = scale_polygon(polygon, distance=distance)
-            inner_polygon = scale_polygon(polygon, distance=-distance)
+            outer_polygon = offset_poly(polygon, distance)
+            inner_polygon = offset_poly(polygon, -distance)
 
             prob_polygons.append(polygon)
             outer_polygons.append(outer_polygon)
@@ -113,6 +115,10 @@ class DBProcessor:
             np.array(ext_map) - np.array(shr_map)
         )
 
-        outputs = (image, shr_map, thres_map)
-        outputs = tuple(map(TF.to_tensor, outputs))
-        return outputs
+        return (
+            TF.to_tensor(image),
+            (
+                TF.to_tensor(shr_map),
+                TF.to_tensor(thres_map)
+            )
+        )
