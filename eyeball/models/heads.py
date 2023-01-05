@@ -1,11 +1,44 @@
 from torch import nn
 
 
-class RetinaHead(nn.Module):
-    pass
+class RetinaRegress(nn.Module):
+    def __init__(
+        self,
+        feature_size: int,
+        num_anchors: int,
+        box_size: int = 4,
+        num_convs: int = 4
+    ):
+        super().__init__()
+        self.convs = nn.Sequential()
+        for i in range(num_convs):
+            pass
 
 
-class DBHead(nn.Module):
+class Retina(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        num_anchors: int,
+        num_classes: int = 1,
+        box_size: int = 4,
+    ):
+        super().__init__()
+        self.num_classes = num_classes
+
+        if num_classes > 1:
+            raise ValueError("Num class is currently only 1")
+
+    def forward(self, features):
+        boxes = self.regression(features)
+        if self.num_classes > 1:
+            classes = self.classification(features)
+        else:
+            classes = None
+        return boxes, classes
+
+
+class DB(nn.Module):
     def __init__(
         self,
         head_size: int,
