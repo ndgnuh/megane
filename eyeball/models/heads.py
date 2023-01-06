@@ -20,17 +20,30 @@ class Retina(nn.Module):
         self,
         in_channels: int,
         num_anchors: int,
+        feature_size: int = 256,
         num_classes: int = 1,
         box_size: int = 4,
     ):
         super().__init__()
         self.num_classes = num_classes
 
-        if num_classes > 1:
-            raise ValueError("Num class is currently only 1")
+        # Bounding box regression head
+        self.regression = nn.Sequential()
+        for i in range(4):
+            in_channel = in_channels if i == 1 else feature_size
+            self.regression.add_module(f"step_{i}", nn.Sequential(
+                nn.Conv2d(in_channel, feature_size, 3, padding=1),
+                nn.GELU(approximate='tanh')
+            ))
+        self.regression.add_module("output", nn.Conv2d(
+            feature_size, num_anchors * box_size, 3, padding=1
+        ))
 
     def forward(self, features):
+        # c h w -> c (h w) -> (h w) c
         boxes = self.regression(features)
+        boxes = boxes.flatten(-2).transpose(-1, -2)
+
         if self.num_classes > 1:
             classes = self.classification(features)
         else:
