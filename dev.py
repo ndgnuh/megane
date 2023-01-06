@@ -8,6 +8,7 @@ from eyeball.models import backbones, heads, losses
 from eyeball.models import detector
 from eyeball import processor
 from eyeball.tools import meanap as MaP
+from eyeball.tools import stats
 from torch import optim, nn
 from tqdm import tqdm
 from argparse import Namespace
@@ -53,6 +54,9 @@ class Trainer(LightningLite):
     def run(self):
         model, optimizer = self.setup(self.model, self.optimizer)
         train_loader = iter([])
+
+        max_score = stats.MaxStatistic(value=-1)
+        min_loss = stats.MinStatistic(value=10e10)
 
         for self.global_step in tqdm(range(self.num_steps), "Training"):
             # Fetching the dataloader continously
