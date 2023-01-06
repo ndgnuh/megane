@@ -119,7 +119,6 @@ class DBProcessor:
             TF.to_tensor(image),
             (
                 TF.to_tensor(prob_map),
-                TF.to_tensor(shr_map),
                 TF.to_tensor(thres_map)
             )
         )

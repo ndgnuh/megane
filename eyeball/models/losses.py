@@ -96,3 +96,11 @@ class DBLoss(nn.Module):
         # ic(Ls, self.alpha * Lb, self.beta * Lt)
         # L = torch.sign(L) * torch.log(torch.abs(L))
         return L
+
+
+class RetinaLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self):
+        pass

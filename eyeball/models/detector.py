@@ -9,16 +9,25 @@ from ..tools import remember
 @dataclass
 class Config:
     backbone: str
+    mode: str
     feature_size: int
+    learning_rate: float = 1e-3
 
 
 class Detector(LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.backbone = backbones.fpn_resnet18(config.feature_size)
-        self.head = heads.DBHead(config.feature_size, 1)
-        self.loss = losses.DBLoss()
+        self.mode = config.mode
+
+        Backbone = getattr(backbones, config.backbone)
+        self.backbone = Backbone(config.feature_size)
+        if config.mode == "db":
+            self.head = heads.DBHead(config.feature_size, 1)
+            self.loss = losses.DBLoss()
+        elif config.mode == "retina":
+            self.head = heads.RetinaHead(config.feature_size)
+            self.loss = losses.RetinaLoss()
 
     def forward(self, image):
         features = self.backbone(image)
@@ -26,11 +35,13 @@ class Detector(LightningModule):
         return self.head(features)
 
     def training_step(self, batch):
-        pass
+        image, annotations = batch
+        outputs = self(image)
+        loss = self.compute_loss(outputs, annotations)
 
     def validation_step(self, batch):
         pass
 
-    def configure_optimizer(self):
-        optimizer = optim.AdamW(self, self.config.learning_rate)
+    def configure_optimizers(self):
+        optimizer = optim.AdamW(self.parameters(), self.config.learning_rate)
         return optimizer
