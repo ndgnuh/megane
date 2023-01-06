@@ -14,27 +14,6 @@ from argparse import Namespace
 icecream.install()
 
 
-class LossFunction(nn.Module):
-    def __init__(self, mode):
-        super().__init__()
-        self.mode = mode
-        if mode == "db":
-            self.loss = losses.DBLoss()
-        elif mode == "retina":
-            self.loss = losses.RetinaLoss()
-        else:
-            raise ValueError("Unsupported loss mode " + str(mode))
-
-    def forward(self, outputs, annotations):
-        mode = self.mode
-        if mode == 'db':
-            prob_map, thres_map = outputs
-            t_prob_map, t_thres_map = annotations
-            return self.loss(prob_map, t_prob_map, thres_map, t_thres_map)
-        else:
-            raise ValueError("Unsupported loss mode " + str(mode))
-
-
 class Trainer(LightningLite):
     def __init__(self, config, **k):
         super().__init__(**k)
@@ -42,7 +21,7 @@ class Trainer(LightningLite):
         self.mode = config.mode
         self.model = detector.Detector(config)
         self.processor = processor.DBProcessor()
-        self.loss = LossFunction(config.mode)
+        self.loss = losses.LossMixin(config.mode)
         self.optimizer = optim.AdamW(self.model.parameters(),
                                      config.learning_rate)
         self.train_loader = self.mk_dataloader('data')
@@ -132,11 +111,6 @@ config = Namespace(
     learning_rate=3e-4,
     batch_size=4,
 )
-
-# x = torch.rand(1, 3, 1024, 1024)
-# with torch.no_grad():
-#     y1, y2 = model.cuda()(x.cuda())
-#     print(y1.shape)
 
 
 trainer = Trainer(config, precision=16, accelerator="gpu")

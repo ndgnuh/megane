@@ -104,3 +104,30 @@ class RetinaLoss(nn.Module):
 
     def forward(self):
         pass
+
+
+def raise_unsupported_mode(mode):
+    raise ValueError("Unsupported loss mode " + str(mode))
+
+
+class LossMixin(nn.Module):
+    def __init__(self, mode):
+        super().__init__()
+        self.mode = mode
+        if mode == "db":
+            self.loss = losses.DBLoss()
+        elif mode == "retina":
+            self.loss = losses.RetinaLoss()
+        else:
+            raise raise_unsupported_mode(mode)
+
+    def forward(self, outputs, annotations):
+        mode = self.mode
+        if mode == 'db':
+            prob_map, thres_map = outputs
+            t_prob_map, t_thres_map = annotations
+            return self.loss(prob_map, t_prob_map, thres_map, t_thres_map)
+        elif mode == "retina":
+            raise raise_unsupported_mode(self.mode)
+        else:
+            raise raise_unsupported_mode(self.mode)
