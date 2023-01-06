@@ -7,7 +7,7 @@ from eyeball.loader import EyeballDataset, DataLoader
 from eyeball.models import backbones, heads, losses
 from eyeball.models import detector
 from eyeball import processor
-from eyeball.tools import meanap, map as MaP
+from eyeball.tools import meanap as MaP
 from torch import optim, nn
 from tqdm import tqdm
 from argparse import Namespace
