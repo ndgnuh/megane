@@ -15,7 +15,7 @@ class RetinaRegress(nn.Module):
             pass
 
 
-class Retina(nn.Module):
+class RetinaHead(nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -51,12 +51,12 @@ class Retina(nn.Module):
         return boxes, classes
 
 
-class DB(nn.Module):
+class DBHead(nn.Module):
     def __init__(
         self,
         head_size: int,
         num_classes: int = 1,
-        num_upscales: int = 4
+        num_upscales: int = 2
     ):
         super().__init__()
         self.num_upscales = num_upscales

@@ -14,7 +14,6 @@ class RetinaProcessor:
     def pre(self, image, annotation):
         image = TF.to_tensor(image)
         boxes = torch.tensor(annotation)
-        ic(boxes.shape)
         return image, boxes
 
     def post(self):

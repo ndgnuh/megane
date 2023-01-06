@@ -3,6 +3,7 @@ from typing import List
 from math import floor
 import torch
 from torchvision.models._utils import IntermediateLayerGetter
+from torchvision import models
 
 
 class FPN(nn.Module):
@@ -21,24 +22,22 @@ class FPN(nn.Module):
         self.in_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(in_channel, out_channel, 1),
-                nn.GELU()
+                nn.GELU(approximate='tanh')
             )
             for in_channel in in_channels
         ])
 
-        self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
         self.out_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(out_channel, mid_channel, 3, padding=1),
-                nn.GELU(),
-                nn.UpsamplingBilinear2d(scale_factor=2**(1 + i))
+                nn.GELU(approximate='tanh'),
+                nn.UpsamplingBilinear2d(scale_factor=2**i)
             )
             for (i, mid_channel) in enumerate(mid_channels)
         ])
 
     def forward(self, features):
         features = [layer(f) for layer, f in zip(self.in_branch, features)]
-        features = map(self.upsample, features)
         features = [layer(f) for layer, f in zip(self.out_branch, features)]
         features = torch.cat(tuple(features), dim=-3)
         return features
@@ -62,3 +61,8 @@ class FPNBackbone(nn.Module):
         features = self.cnn(image)
         features = self.fpn(features.values())
         return features
+
+
+def fpn_resnet18(output_size: int):
+    cnn = models.resnet18()
+    return FPNBackbone(cnn, output_size, ["layer1", "layer2", "layer3", "layer4"])
