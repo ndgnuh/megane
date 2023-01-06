@@ -14,7 +14,10 @@ class BalancedBCEWithLogitsLoss:
         n_negative = torch.min(torch.count_nonzero(
             ~target_mask), self.k * n_positive)
         losses = F.binary_cross_entropy_with_logits(
-            predicts, targets, reduction="none")
+            predicts,
+            targets,
+            reduction="none"
+        )
 
         pos_losses = torch.sum(losses[target_mask])
         neg_losses = torch.sum(losses[~target_mask].sort(
@@ -115,9 +118,9 @@ class LossMixin(nn.Module):
         super().__init__()
         self.mode = mode
         if mode == "db":
-            self.loss = losses.DBLoss()
+            self.loss = DBLoss()
         elif mode == "retina":
-            self.loss = losses.RetinaLoss()
+            self.loss = RetinaLoss()
         else:
             raise raise_unsupported_mode(mode)
 
