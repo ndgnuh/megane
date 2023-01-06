@@ -22,12 +22,7 @@ class Detector(LightningModule):
 
         Backbone = getattr(backbones, config.backbone)
         self.backbone = Backbone(config.feature_size)
-        if config.mode == "db":
-            self.head = heads.DBHead(config.feature_size, 1)
-            self.loss = losses.DBLoss()
-        elif config.mode == "retina":
-            self.head = heads.RetinaHead(config.feature_size)
-            self.loss = losses.RetinaLoss()
+        self.head = heads.HeadMixin(config.mode, config.head_options)
 
     def forward(self, image):
         features = self.backbone(image)

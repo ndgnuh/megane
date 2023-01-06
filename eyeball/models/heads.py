@@ -100,3 +100,11 @@ class DBHead(nn.Module):
             layers.extend([conv, act])
 
         return nn.Sequential(*layers)
+
+
+def HeadMixin(mode, options):
+    if mode == "db":
+        return DBHead(**options)
+    if mode == "retina":
+        return RetinaHead(**options)
+    raise ValueError("Unsupported mode")

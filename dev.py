@@ -21,15 +21,15 @@ class Trainer(LightningLite):
         self.batch_size = config.batch_size
         self.mode = config.mode
         self.model = detector.Detector(config)
-        self.processor = processor.DBProcessor()
+        self.processor = processor.ProcessorMixin(config.mode)
         self.loss = losses.LossMixin(config.mode)
         self.optimizer = optim.AdamW(self.model.parameters(),
                                      config.learning_rate)
         self.train_loader = self.mk_dataloader('data')
         self.val_loader = self.mk_dataloader('data')
-        self.validate_every = 200
-        self.print_every = 200
-        self.num_steps = 100000
+        self.validate_every = 500
+        self.print_every = 500
+        self.num_steps = 10000
 
     @torch.no_grad()
     def run_validate(self, model):
@@ -78,7 +78,7 @@ class Trainer(LightningLite):
             optimizer.step()
 
             if self.is_matching_step(self.print_every):
-                info = "[Train] step: {step}/{total} - loss {loss:.4f}"
+                info = "[T] step: {step}/{total} - loss {loss:.4f}"
                 info = info.format_map({
                     "step": self.global_step,
                     "total": self.num_steps,
@@ -89,7 +89,7 @@ class Trainer(LightningLite):
             # validation
             if self.is_matching_step(self.validate_every):
                 metrics = self.run_validate(model)
-                info = "[Validate] step: {step}/{total} - loss: {loss:.4f} - MeanAP: {meanap:.2f}"
+                info = "[V] step: {step}/{total} - loss: {loss:.4f} - MeanAP: {meanap:.2f}"
                 metrics['step'] = self.global_step
                 metrics['total'] = self.num_steps
                 info = info.format_map(metrics)
@@ -114,6 +114,10 @@ config = Namespace(
     feature_size=256,
     learning_rate=3e-4,
     batch_size=4,
+    head_options=dict(head_size=256)
+    #     num_anchors=8,
+    #     in_channels=256
+    # )
 )
 
 

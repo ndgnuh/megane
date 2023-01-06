@@ -21,7 +21,8 @@ class BalancedBCEWithLogitsLoss:
 
         pos_losses = torch.sum(losses[target_mask])
         neg_losses = torch.sum(losses[~target_mask].sort(
-            descending=True).values[:n_negative])
+            descending=True).values[:n_negative]
+        )
         balanced_loss = (pos_losses + neg_losses) / (n_positive + n_negative)
         return balanced_loss
 
