@@ -31,17 +31,4 @@ class Detector(LightningModule):
 
     def forward(self, image):
         features = self.backbone(image)
-        ic(image.shape, features.shape)
         return self.head(features)
-
-    def training_step(self, batch):
-        image, annotations = batch
-        outputs = self(image)
-        loss = self.compute_loss(outputs, annotations)
-
-    def validation_step(self, batch):
-        pass
-
-    def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), self.config.learning_rate)
-        return optimizer

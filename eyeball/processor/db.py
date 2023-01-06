@@ -1,7 +1,23 @@
 from dataclasses import dataclass, field
-from torchvision.transforms import functional as TF
 from PIL import Image, ImageDraw
 import numpy as np
+
+
+def expand_rect(x1, y1, x2, y2, r):
+    w = x2 - x1
+    h = y2 - y1
+
+    # Expand distance
+    A = w * h
+    L = 2 * (w + h)
+    d = A * (1 - r**2) / L
+
+    # Expanded
+    x1 = max(x1 + d, 0)
+    y1 = max(y1 + d, 0)
+    x2 = x2 - d
+    y2 = y2 - d
+    return x1, y1, x2, y2
 
 
 def polygon_area(poly):
@@ -76,11 +92,15 @@ def draw_mask(size, polygons, fill=255):
 
 @dataclass
 class DBProcessor:
-    expand_ratio: float = 0.4
+    shrink_ratio: float = 0.4
+    expand_ratio: float = 1.5
+    min_box_size: int = 10
+    min_box_score: int = 0.6
 
     # I'm being lazy here
     # the code is adapted from a previous implementation using polygon
     def pre(self, image, boxes):
+        from torchvision.transforms import functional as TF
         width, height = image.size
 
         prob_polygons = []
@@ -95,9 +115,12 @@ class DBProcessor:
 
             box_width = x2 - x1
             box_height = y2 - y1
+            if box_height < self.min_box_size or box_width < self.min_box_size:
+                continue
+
             area = box_width * box_height
             length = (box_width + box_height) * 2
-            distance = area * (1 - self.expand_ratio ** 2) / length
+            distance = area * (1 - self.shrink_ratio ** 2) / length
 
             polygon = [(x1, y1), (x1, y2), (x2, y2), (x2, y1)]
             outer_polygon = offset_poly(polygon, distance)
@@ -122,3 +145,45 @@ class DBProcessor:
                 TF.to_tensor(thres_map)
             )
         )
+
+    def post(self, outputs):
+        proba_maps, _ = outputs
+        batch, nclasses, height, width = proba_maps.shape
+        assert nclasses == 1
+
+        return [self.postprocess_single(pmap[0]) for pmap in proba_maps]
+
+    def postprocess_single(self, proba_map):
+        import numpy as np
+        import cv2
+
+        proba_map = proba_map.cpu().detach().numpy()
+        mask = (proba_map > 0.2).astype('uint8')
+
+        min_box_size = self.min_box_size
+        min_box_score = self.min_box_score
+        expand_ratio = self.expand_ratio
+
+        stats = cv2.connectedComponentsWithStats(mask)
+        rects = stats[2][1:, :4]
+        boxes = []
+        scores = []
+
+        label = False
+        for (x1, y1, w, h) in rects:
+            if w < min_box_size or h < min_box_size:
+                continue
+            x2 = x1 + w - 1
+            y2 = y1 + h - 1
+
+            if not label:
+                score = proba_map[y1:y2, x1:x2].mean()
+                if np.isnan(score) or score <= min_box_score:
+                    continue
+
+            x1, y1, x2, y2 = expand_rect(x1, y1, x2, y2, expand_ratio)
+            box = (x1, y1, x2, y2)
+            if not label:
+                scores.append(score)
+            boxes.append(box)
+        return dict(boxes=boxes, scores=scores)
