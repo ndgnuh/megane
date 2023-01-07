@@ -71,7 +71,7 @@ class Trainer(LightningLite):
             outputs = model(image)
             loss = self.loss(outputs, annotations)
             prs = self.model.processor.post(outputs)
-            gts = self.model.processor.post(annotations)
+            gts = self.model.processor.post(annotations, is_target=True)
             meanap = MaP.calc_mean_ap(prs, gts)
             score.append(meanap)
             losses.append(loss)

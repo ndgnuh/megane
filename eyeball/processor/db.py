@@ -182,16 +182,17 @@ class DBProcessor:
             )
         )
 
-    def post(self, outputs):
+    def post(self, outputs, is_target=False):
         proba_maps, _ = outputs
         batch, nclasses, height, width = proba_maps.shape
         assert nclasses == 1
+        if not is_target:
+            import torch
+            proba_maps = torch.sigmoid(proba_maps * 50)
 
         return [self.postprocess_single(pmap[0]) for pmap in proba_maps]
 
     def postprocess_single(self, proba_map):
-        import torch
-        proba_map = torch.sigmoid(proba_map * 50)
         proba_map = proba_map.detach().cpu().numpy()
         boxes, scores = mask_to_boxes(
             mask=proba_map >= 0.5,
