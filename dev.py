@@ -29,7 +29,7 @@ class Trainer(LightningLite):
         self.val_loader = self.mk_dataloader('data')
         self.validate_every = 500
         self.print_every = 500
-        self.num_steps = 10000
+        self.num_steps = 50000
 
     @torch.no_grad()
     def run_validate(self, model):
@@ -55,8 +55,7 @@ class Trainer(LightningLite):
         model, optimizer = self.setup(self.model, self.optimizer)
         train_loader = iter([])
 
-        max_score = stats.MaxStatistic(value=-1)
-        min_loss = stats.MinStatistic(value=10e10)
+        self.max_score = 0
 
         for self.global_step in tqdm(range(self.num_steps), "Training"):
             # Fetching the dataloader continously
@@ -94,10 +93,14 @@ class Trainer(LightningLite):
                 metrics['total'] = self.num_steps
                 info = info.format_map(metrics)
                 tqdm.write(info)
+                if self.max_score <= metrics['meanap']:
+                    torch.save(self.model.state_dict(), "best.pt")
+                    tqdm.write("Model saved to best.pt")
+                    self.max_score = metrics['meanap']
 
     def mk_dataloader(self, data_root):
         data = EyeballDataset(
-            data_root, 224, 224,
+            data_root, 1024, 1024,
             preprocess=self.processor.pre
         )
         return DataLoader(data, batch_size=self.batch_size)
@@ -121,5 +124,5 @@ config = Namespace(
 )
 
 
-trainer = Trainer(config, precision=16, accelerator="gpu")
+trainer = Trainer(config, accelerator="gpu")
 trainer.run()
