@@ -3,27 +3,27 @@ from pytorch_lightning import LightningModule
 from torch import nn, optim
 
 from . import backbones, heads, losses
+from .. import processor
+from ..tools import init
 from ..tools import remember
 
 
-@dataclass
-class Config:
-    backbone: str
-    mode: str
-    feature_size: int
-    learning_rate: float = 1e-3
-
-
-class Detector(LightningModule):
+class Detector(nn.Sequential):
     def __init__(self, config):
         super().__init__()
-        self.config = config
-        self.mode = config.mode
+        self.backbone = init.init_from_ns(
+            backbones,
+            config['backbone'],
+            config['backbone_options']
+        )
+        self.head = init.init_from_ns(
+            heads,
+            config['head'],
+            config['head_options']
+        )
 
-        Backbone = getattr(backbones, config.backbone)
-        self.backbone = Backbone(config.feature_size)
-        self.head = heads.HeadMixin(config.mode, config.head_options)
-
-    def forward(self, image):
-        features = self.backbone(image)
-        return self.head(features)
+        self.processor = init.init_from_ns(
+            processor,
+            config['processor'],
+            config.get('processor_options', {})
+        )

@@ -69,11 +69,16 @@ class DBLoss(nn.Module):
         # self.bce = nn.BCELoss()
         self.l1 = nn.L1Loss()
 
-    def forward(self,
-                proba_map: Tensor,
-                target_proba_map: Tensor,
-                thresh_map: Tensor,
-                target_thresh_map: Tensor):
+    # def forward(self,
+    #             proba_map: Tensor,
+    #             target_proba_map: Tensor,
+    #             thresh_map: Tensor,
+    #             target_thresh_map: Tensor):
+    def forward(self, outputs, annotations):
+        # Compat with training interface
+        proba_map, thresh_map = outputs
+        target_proba_map, target_thresh_map = annotations
+
         # Segmentation map
         # Skip the 1 / (1 + exp(...)) here, because we're using bce with logits
         r = self.r

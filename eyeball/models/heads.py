@@ -54,14 +54,18 @@ class RetinaHead(nn.Module):
 class DBHead(nn.Module):
     def __init__(
         self,
-        head_size: int,
+        input_size: int,
         num_classes: int = 1,
-        num_upscales: int = 2
+        num_upscales: int = 2,
+        activation: str = 'ReLU'
     ):
         super().__init__()
         self.num_upscales = num_upscales
         self.num_classes = num_classes
-        self.head_size = head_size
+        self.input_size = input_size
+        self.activation = activation
+        assert hasattr(nn, activation), f"Invalid activation {activation}"
+
         self.prob_head = self.make_branch()
         self.thres_head = self.make_branch()
 
@@ -74,11 +78,11 @@ class DBHead(nn.Module):
         return prob, thres
 
     def make_branch(self):
-        head_size = self.head_size
-        head_size_d4 = self.head_size // 4
+        input_size = self.input_size
+        head_size_d4 = self.input_size // 4
 
         layers = [
-            nn.Conv2d(head_size, head_size_d4, 3, padding=1, bias=False),
+            nn.Conv2d(input_size, head_size_d4, 3, padding=1, bias=False),
             nn.BatchNorm2d(head_size_d4),
             nn.ReLU(),
         ]
@@ -96,7 +100,7 @@ class DBHead(nn.Module):
                 stride=2,
                 bias=False
             )
-            act = nn.ReLU()
+            act = getattr(nn, self.activation)()
             layers.extend([conv, act])
 
         return nn.Sequential(*layers)

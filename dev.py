@@ -1,3 +1,5 @@
+from eyeball.config import read_yaml
+from argparse import ArgumentParser
 from itertools import cycle
 import torch
 import icecream
@@ -12,24 +14,43 @@ from eyeball.tools import stats
 from torch import optim, nn
 from tqdm import tqdm
 from argparse import Namespace
+from eyeball.tools import init
 icecream.install()
 
 
 class Trainer(LightningLite):
-    def __init__(self, config, **k):
-        super().__init__(**k)
-        self.batch_size = config.batch_size
-        self.mode = config.mode
-        self.model = detector.Detector(config)
-        self.processor = processor.ProcessorMixin(config.mode)
-        self.loss = losses.LossMixin(config.mode)
-        self.optimizer = optim.AdamW(self.model.parameters(),
-                                     config.learning_rate)
-        self.train_loader = self.mk_dataloader('data')
-        self.val_loader = self.mk_dataloader('data')
-        self.validate_every = 500
-        self.print_every = 500
-        self.num_steps = 50000
+    def __init__(self, model_config, train_config):
+        lightning_options = train_config.get('lightning_options', {})
+        super().__init__(**lightning_options)
+        self.train_config = train_config
+        self.model_config = model_config
+
+        self.model = detector.Detector(model_config)
+        self.loss = init.init_from_ns(
+            losses,
+            model_config['loss'],
+            model_config.get('loss_options', {}),
+        )
+
+        self.optimizer = init.init_from_ns(
+            optim,
+            train_config['optimizer'],
+            train_config.get('optimizer_options', {}),
+            self.model.parameters()
+        )
+        if 'lr_scheduler' in train_config:
+            self.lr_scheduler = init.init_from_ns(
+                optim.lr_scheduler,
+                train_config['lr_scheduler'],
+                train_config.get('lr_scheduler_options', {}),
+                self.optimizer
+            )
+
+        for k in ["total_steps", "print_every", "validate_every"]:
+            setattr(self, k, train_config[k])
+
+        self.train_loader = self.mk_dataloader(train_config['train_data'])
+        self.val_loader = self.mk_dataloader(train_config['validate_data'])
 
     @torch.no_grad()
     def run_validate(self, model):
@@ -39,8 +60,8 @@ class Trainer(LightningLite):
         for image, annotations in tqdm(val_loader, "Validating"):
             outputs = model(image)
             loss = self.loss(outputs, annotations)
-            prs = self.processor.post(outputs)
-            gts = self.processor.post(annotations)
+            prs = self.model.processor.post(outputs)
+            gts = self.model.processor.post(annotations)
             meanap = MaP.calc_mean_ap(prs, gts)
             score.append(meanap)
             losses.append(loss)
@@ -57,7 +78,7 @@ class Trainer(LightningLite):
 
         self.max_score = 0
 
-        for self.global_step in tqdm(range(self.num_steps), "Training"):
+        for self.global_step in tqdm(range(self.total_steps), "Training"):
             # Fetching the dataloader continously
             # First trainloader is set to empty
             # to avoid repetition
@@ -100,10 +121,13 @@ class Trainer(LightningLite):
 
     def mk_dataloader(self, data_root):
         data = EyeballDataset(
-            data_root, 1024, 1024,
-            preprocess=self.processor.pre
+            data_root,
+            self.model_config['image_width'],
+            self.model_config['image_height'],
+            preprocess=self.model.processor.pre
         )
-        return DataLoader(data, batch_size=self.batch_size)
+
+        return DataLoader(data, **self.train_config['dataloader_options'])
 
 
 class Predictor:
@@ -111,18 +135,15 @@ class Predictor:
         pass
 
 
-config = Namespace(
-    backbone="fpn_resnet18",
-    mode="db",
-    feature_size=256,
-    learning_rate=3e-4,
-    batch_size=4,
-    head_options=dict(head_size=256)
-    #     num_anchors=8,
-    #     in_channels=256
-    # )
-)
-
-
-trainer = Trainer(config, accelerator="gpu")
+# config = Namespace(
+#     backbone="fpn_resnet18",
+#     mode="db",
+#     feature_size=256,
+#     learning_rate=3e-4,
+#     batch_size=4,
+#     head_options=dict(head_size=256)
+# )
+train_config = read_yaml("configs/train.yaml")
+model_config = read_yaml("configs/db_resnet18.yml")
+trainer = Trainer(model_config, train_config)
 trainer.run()
