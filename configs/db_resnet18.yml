@@ -1,0 +1,21 @@
+# Rejects wizardry
+# Returns to KISS redundancy
+
+backbone: fpn_resnet18
+backbone_options:
+  output_size: 256
+
+head: DBHead
+head_options:
+  input_size: 256
+  activation: GELU
+
+processor: DBProcessor
+processor_options: {}
+
+loss: DBLoss
+loss_options: {}
+
+image_width: 1024
+image_height: 1024
+
