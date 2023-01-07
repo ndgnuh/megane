@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from PIL import Image, ImageDraw, ImageChops
+import numpy as np
+import cv2
 
 
 def denormalize(box, width, height, norm_constant=1000):
@@ -41,21 +43,40 @@ def generate_db_masks(size, boxes, r=0.4):
     return proba_map, threshold_map
 
 
-def expand_rect(x1, y1, x2, y2, r):
-    w = x2 - x1
-    h = y2 - y1
+def mask_to_boxes(mask: np.ndarray,
+                  min_box_size: int,
+                  min_box_score: int,
+                  expand_ratio: float,
+                  proba_map: np.ndarray = None):
+    # targets don't have proba map (maybe?)
+    calculate_score = proba_map is not None
+    image_height, image_width = mask.shape
 
-    # Expand distance
-    A = w * h
-    L = 2 * (w + h)
-    d = A * (1 - r**2) / L
+    # mask: h * w
+    stats = cv2.connectedComponentsWithStats(mask.astype('uint8'))
+    boxes, scores = [], []
+    for (x1, y1, w, h, s) in stats[2]:
+        # Check for too-small boxes
 
-    # Expanded
-    x1 = max(x1 + d, 0)
-    y1 = max(y1 + d, 0)
-    x2 = x2 - d
-    y2 = y2 - d
-    return x1, y1, x2, y2
+        x2 = x1 + w
+        y2 = y1 + h
+        if calculate_score:
+            score = proba_map[y1:y2, x1:x2].mean()
+        else:
+            score = 1
+
+        if np.isnan(score) or score <= min_box_score:
+            continue
+
+        x1, y1, x2, y2 = offset_rect((x1, y1, x2, y2), expand_ratio, True)
+        if x2 - x1 < min_box_size or y2 - y1 < min_box_size:
+            continue
+        box = (x1 / image_width, y1 / image_height,
+               x2 / image_width, y2 / image_height)
+        scores.append(score)
+        boxes.append(box)
+
+    return boxes, scores
 
 
 def polygon_area(poly):
@@ -169,36 +190,14 @@ class DBProcessor:
         return [self.postprocess_single(pmap[0]) for pmap in proba_maps]
 
     def postprocess_single(self, proba_map):
-        import numpy as np
-        import cv2
-
-        proba_map = proba_map.cpu().detach().numpy()
-        mask = (proba_map > 0.2).astype('uint8')
-
-        min_box_size = self.min_box_size
-        min_box_score = self.min_box_score
-        expand_ratio = self.expand_ratio
-
-        stats = cv2.connectedComponentsWithStats(mask)
-        rects = stats[2][1:, :4]
-        boxes = []
-        scores = []
-
-        label = False
-        for (x1, y1, w, h) in rects:
-            if w < min_box_size or h < min_box_size:
-                continue
-            x2 = x1 + w - 1
-            y2 = y1 + h - 1
-
-            if not label:
-                score = proba_map[y1:y2, x1:x2].mean()
-                if np.isnan(score) or score <= min_box_score:
-                    continue
-
-            x1, y1, x2, y2 = expand_rect(x1, y1, x2, y2, expand_ratio)
-            box = (x1, y1, x2, y2)
-            if not label:
-                scores.append(score)
-            boxes.append(box)
+        import torch
+        proba_map = torch.sigmoid(proba_map * 50)
+        proba_map = proba_map.detach().cpu().numpy()
+        boxes, scores = mask_to_boxes(
+            mask=proba_map > 0.02,
+            min_box_size=self.min_box_size,
+            min_box_score=self.min_box_score,
+            expand_ratio=0.4,
+            proba_map=proba_map
+        )
         return dict(boxes=boxes, scores=scores)
