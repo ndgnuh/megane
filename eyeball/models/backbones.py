@@ -66,3 +66,24 @@ class FPNBackbone(nn.Module):
 def fpn_resnet18(output_size: int):
     cnn = models.resnet18()
     return FPNBackbone(cnn, output_size, ["layer1", "layer2", "layer3", "layer4"])
+
+
+def fpn_resnet34(output_size: int):
+    cnn = models.resnet18()
+    return FPNBackbone(cnn, output_size, ["layer1", "layer2", "layer3", "layer4"])
+
+
+def fpn_resnet50(output_size: int):
+    cnn = models.resnet18()
+    return FPNBackbone(cnn, output_size, ["layer1", "layer2", "layer3", "layer4"])
+
+
+def fpn_shufflenet_v2_x0_5(output_size: int):
+    cnn = models.shufflenet_v2_x0_5()
+    layers = ['maxpool', 'stage2', 'stage3', 'stage4']
+    return FPNBackbone(cnn, output_size, layers)
+
+
+def fpn_mobilenet_v2(output_size: int):
+    cnn = models.mobilenet_v3()
+    return FPNBackbone(model, output_size, ['2', '4', '7', '14'])
