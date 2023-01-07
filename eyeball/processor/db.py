@@ -1,6 +1,44 @@
 from dataclasses import dataclass, field
-from PIL import Image, ImageDraw
-import numpy as np
+from PIL import Image, ImageDraw, ImageChops
+
+
+def denormalize(box, width, height, norm_constant=1000):
+    x1, y1, x2, y2 = box
+    x1 = x1 / norm_constant * width
+    y1 = y1 / norm_constant * height
+    x2 = x2 / norm_constant * width
+    y2 = y2 / norm_constant * height
+    return x1, y1, x2, y2
+
+
+def offset_rect(xyxy, r, expand=False):
+    x1, y1, x2, y2 = xyxy
+    w = x2 - x1
+    h = y2 - y1
+
+    # Expand distance
+    A = w * h
+    L = 2 * (w + h)
+    d = A * (1 - r**2) / L
+
+    if expand:
+        d = -d
+
+    # Expanded
+    x1 = max(x1 + d, 0)
+    y1 = max(y1 + d, 0)
+    x2 = x2 - d
+    y2 = y2 - d
+    return x1, y1, x2, y2
+
+
+def generate_db_masks(size, boxes, r=0.4):
+    shrink = [offset_rect(box, r, False) for box in boxes]
+    expand = [offset_rect(box, r, True) for box in boxes]
+    proba_map = draw_mask_rect(size, shrink)
+    threshold_map = draw_mask_rect(size, expand)
+    threshold_map = ImageChops.subtract(threshold_map, proba_map)
+    return proba_map, threshold_map
 
 
 def expand_rect(x1, y1, x2, y2, r):
@@ -90,9 +128,17 @@ def draw_mask(size, polygons, fill=255):
     return mask
 
 
+def draw_mask_rect(size, rects, fill=255):
+    mask = Image.new("L", size)
+    draw = ImageDraw.Draw(mask)
+    for rect in rects:
+        draw.rectangle(rect, fill=fill)
+    return mask
+
+
 @dataclass
 class DBProcessor:
-    shrink_ratio: float = 0.4
+    offset_ratio: float = 0.4
     expand_ratio: float = 1.5
     min_box_size: int = 10
     min_box_score: int = 0.6
@@ -101,48 +147,17 @@ class DBProcessor:
     # the code is adapted from a previous implementation using polygon
     def pre(self, image, boxes):
         from torchvision.transforms import functional as TF
-        width, height = image.size
-
-        prob_polygons = []
-        outer_polygons = []
-        inner_polygons = []
-        for box in boxes:
-            x1, y1, x2, y2 = box[:4]
-            x1 = x1 / 1000 * width
-            x2 = x2 / 1000 * width
-            y1 = y1 / 1000 * height
-            y2 = y2 / 1000 * height
-
-            box_width = x2 - x1
-            box_height = y2 - y1
-            if box_height < self.min_box_size or box_width < self.min_box_size:
-                continue
-
-            area = box_width * box_height
-            length = (box_width + box_height) * 2
-            distance = area * (1 - self.shrink_ratio ** 2) / length
-
-            polygon = [(x1, y1), (x1, y2), (x2, y2), (x2, y1)]
-            outer_polygon = offset_poly(polygon, distance)
-            inner_polygon = offset_poly(polygon, -distance)
-
-            prob_polygons.append(polygon)
-            outer_polygons.append(outer_polygon)
-            inner_polygons.append(inner_polygon)
-
-        # Create masks
-        prob_map = draw_mask((width, height), prob_polygons)
-        ext_map = draw_mask((width, height), outer_polygons)
-        shr_map = draw_mask((width, height), inner_polygons)
-        thres_map = Image.fromarray(
-            np.array(ext_map) - np.array(shr_map)
+        boxes = [denormalize(box, *image.size) for box in boxes]
+        proba_map, threshold_map = generate_db_masks(
+            image.size,
+            boxes,
+            self.offset_ratio
         )
-
         return (
             TF.to_tensor(image),
             (
-                TF.to_tensor(shr_map),
-                TF.to_tensor(thres_map)
+                TF.to_tensor(proba_map),
+                TF.to_tensor(threshold_map)
             )
         )
 

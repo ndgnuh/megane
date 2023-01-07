@@ -101,7 +101,7 @@ class Trainer(LightningLite):
                 info = "[T] step: {step}/{total} - loss {loss:.4f}"
                 info = info.format_map({
                     "step": self.global_step,
-                    "total": self.num_steps,
+                    "total": self.total_steps,
                     "loss": loss.item()
                 })
                 tqdm.write(info)
@@ -111,7 +111,7 @@ class Trainer(LightningLite):
                 metrics = self.run_validate(model)
                 info = "[V] step: {step}/{total} - loss: {loss:.4f} - MeanAP: {meanap:.2f}"
                 metrics['step'] = self.global_step
-                metrics['total'] = self.num_steps
+                metrics['total'] = self.total_steps
                 info = info.format_map(metrics)
                 tqdm.write(info)
                 if self.max_score <= metrics['meanap']:
@@ -143,7 +143,8 @@ class Predictor:
 #     batch_size=4,
 #     head_options=dict(head_size=256)
 # )
-train_config = read_yaml("configs/train.yaml")
-model_config = read_yaml("configs/db_resnet18.yml")
-trainer = Trainer(model_config, train_config)
-trainer.run()
+if __name__ == "__main__":
+    train_config = read_yaml("configs/train.yaml")
+    model_config = read_yaml("configs/db_resnet18.yml")
+    trainer = Trainer(model_config, train_config)
+    trainer.run()
