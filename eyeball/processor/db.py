@@ -194,7 +194,7 @@ class DBProcessor:
         proba_map = torch.sigmoid(proba_map * 50)
         proba_map = proba_map.detach().cpu().numpy()
         boxes, scores = mask_to_boxes(
-            mask=proba_map > 0.5,
+            mask=proba_map > 0.05,
             min_box_size=self.min_box_size,
             min_box_score=self.min_box_score,
             expand_ratio=self.offset_ratio,

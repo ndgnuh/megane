@@ -1,4 +1,4 @@
-from eyeball.config import read_yaml
+from eyeball.config import read_yaml, get_name
 from argparse import ArgumentParser
 from itertools import cycle
 import torch
@@ -15,6 +15,7 @@ from torch import optim, nn
 from tqdm import tqdm
 from argparse import Namespace
 from eyeball.tools import init
+from os import path
 icecream.install()
 
 
@@ -24,6 +25,15 @@ class Trainer(LightningLite):
         super().__init__(**lightning_options)
         self.train_config = train_config
         self.model_config = model_config
+        self.name = model_config['name']
+        self.best_weight_path = path.join(
+            "storage/weights/",
+            f"{self.name}-best.pt"
+        )
+        self.latest_weight_path = path.join(
+            "storage/weights/",
+            f"{self.name}-latest.pt"
+        )
 
         self.model = detector.Detector(model_config)
         self.loss = init.init_from_ns(
@@ -114,10 +124,14 @@ class Trainer(LightningLite):
                 metrics['total'] = self.total_steps
                 info = info.format_map(metrics)
                 tqdm.write(info)
+                self.save_weights(self.latest_weight_path)
                 if self.max_score <= metrics['meanap']:
-                    torch.save(self.model.state_dict(), "best.pt")
-                    tqdm.write("Model saved to best.pt")
+                    self.save_weights(self.best_weight_path)
                     self.max_score = metrics['meanap']
+
+    def save_weights(self, path):
+        torch.save(self.model.state_dict(), path)
+        tqdm.write(f"Model saved to {path}")
 
     def mk_dataloader(self, data_root):
         data = EyeballDataset(
@@ -145,6 +159,6 @@ class Predictor:
 # )
 if __name__ == "__main__":
     train_config = read_yaml("configs/train.yaml")
-    model_config = read_yaml("configs/db_resnet18.yml")
+    model_config = read_yaml("configs/db_mobilenet_v2.yml")
     trainer = Trainer(model_config, train_config)
     trainer.run()
