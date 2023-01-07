@@ -80,10 +80,10 @@ def fpn_resnet50(output_size: int):
 
 def fpn_shufflenet_v2_x0_5(output_size: int):
     cnn = models.shufflenet_v2_x0_5()
-    layers = ['maxpool', 'stage2', 'stage3', 'stage4']
+    layers = ['maxpool', 'stage2', 'stage3', 'conv5']
     return FPNBackbone(cnn, output_size, layers)
 
 
 def fpn_mobilenet_v2(output_size: int):
     cnn = models.mobilenet_v2().features
-    return FPNBackbone(cnn, output_size, ['2', '4', '7', '14'])
+    return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
