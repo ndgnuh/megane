@@ -57,9 +57,11 @@ def mask_to_boxes(mask: np.ndarray,
     boxes, scores = [], []
     for (x1, y1, w, h, s) in stats[2]:
         # Check for too-small boxes
-
         x2 = x1 + w
         y2 = y1 + h
+        if x2 - x1 < min_box_size or y2 - y1 < min_box_size:
+            continue
+
         if calculate_score:
             score = proba_map[y1:y2, x1:x2].mean()
         else:
@@ -68,11 +70,9 @@ def mask_to_boxes(mask: np.ndarray,
         if np.isnan(score) or score <= min_box_score:
             continue
 
-        x1, y1, x2, y2 = offset_rect((x1, y1, x2, y2), expand_ratio, True)
-        if x2 - x1 < min_box_size or y2 - y1 < min_box_size:
-            continue
         box = (x1 / image_width, y1 / image_height,
                x2 / image_width, y2 / image_height)
+        x1, y1, x2, y2 = offset_rect(box, expand_ratio, True)
         scores.append(score)
         boxes.append(box)
 
@@ -194,10 +194,10 @@ class DBProcessor:
         proba_map = torch.sigmoid(proba_map * 50)
         proba_map = proba_map.detach().cpu().numpy()
         boxes, scores = mask_to_boxes(
-            mask=proba_map > 0.02,
+            mask=proba_map > 0.5,
             min_box_size=self.min_box_size,
             min_box_score=self.min_box_score,
-            expand_ratio=0.4,
+            expand_ratio=self.offset_ratio,
             proba_map=proba_map
         )
         return dict(boxes=boxes, scores=scores)
