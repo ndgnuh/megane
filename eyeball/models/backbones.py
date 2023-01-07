@@ -85,5 +85,5 @@ def fpn_shufflenet_v2_x0_5(output_size: int):
 
 
 def fpn_mobilenet_v2(output_size: int):
-    cnn = models.mobilenet_v3()
-    return FPNBackbone(model, output_size, ['2', '4', '7', '14'])
+    cnn = models.mobilenet_v2().features
+    return FPNBackbone(cnn, output_size, ['2', '4', '7', '14'])

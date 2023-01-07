@@ -1,7 +1,7 @@
 # Rejects wizardry
 # Returns to KISS redundancy
 
-backbone: db_mobilenet_v2
+backbone: fpn_mobilenet_v2
 backbone_options:
   output_size: 256
 
