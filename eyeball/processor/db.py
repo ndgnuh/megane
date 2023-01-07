@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from PIL import Image, ImageDraw, ImageChops
+from scipy.special import expit as sigmoid
 import numpy as np
 import cv2
 
@@ -199,6 +200,6 @@ class DBProcessor:
             min_box_size=self.min_box_size,
             min_box_score=self.min_box_score,
             expand_ratio=self.offset_ratio,
-            proba_map=proba_map
+            proba_map=sigmoid(proba_map)
         )
         return dict(boxes=boxes, scores=scores)
