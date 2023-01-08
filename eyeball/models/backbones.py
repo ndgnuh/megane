@@ -102,7 +102,7 @@ def fpn_mobilenet_v3_large(output_size: int):
 
 def fpn_mobilenet_v3_small(output_size: int):
     cnn = models.mobilenet_v3_small().features
-    return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
+    return FPNBackbone(cnn, output_size,  ['1', '3', '8', '12'])
 
 
 def fpn_efficientnet_b3(output_size: int):
