@@ -60,7 +60,7 @@ def mask_to_boxes(mask: np.ndarray,
         # Check for too-small boxes
         x2 = x1 + w
         y2 = y1 + h
-        if x2 - x1 < min_box_size or y2 - y1 < min_box_size:
+        if x2 - x1 < min_box_size or y2 - y1 < min_box_size or w >= 0.95 * image_width or h >= 0.95 * image_height:
             continue
 
         if calculate_score:

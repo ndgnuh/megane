@@ -88,20 +88,18 @@ class DBHead(nn.Module):
         ]
 
         for i in range(self.num_upscales):
-            if i == self.num_upscales - 1:
-                output_size = self.num_classes
-            else:
-                output_size = head_size_d4
-
             conv = nn.ConvTranspose2d(
                 head_size_d4,
-                output_size,
+                head_size_d4,
                 kernel_size=2,
                 stride=2,
                 bias=False
             )
             act = getattr(nn, self.activation)()
             layers.extend([conv, act])
+        layers.append(
+            nn.Conv2d(head_size_d4, self.num_classes, 1, bias=False)
+        )
 
         return nn.Sequential(*layers)
 
