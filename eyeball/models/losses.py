@@ -63,7 +63,7 @@ class DBLoss(nn.Module):
         self.r = r
         self.alpha = alpha
         self.beta = beta
-        self.bce = BalancedBCEWithLogitsLoss(k=3)
+        self.bce = BalancedBCEWithLogitsLoss(k=1)
         # self.bce = BalancedBCELoss(k=3)
         # self.bce = nn.BCEWithLogitsLoss()
         # self.bce = nn.BCELoss()
