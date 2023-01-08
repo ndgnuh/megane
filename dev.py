@@ -106,13 +106,15 @@ class Trainer(LightningLite):
             loss = self.loss(outputs, annotations)
             self.backward(loss)
             optimizer.step()
+            self.lr_scheduler.step()
 
             if self.is_matching_step(self.print_every):
-                info = "[T] step: {step}/{total} - loss {loss:.4f}"
+                info = "[T] step: {step}/{total} - loss {loss:.4f} - lr {lr:.3e}"
                 info = info.format_map({
                     "step": self.global_step,
                     "total": self.total_steps,
-                    "loss": loss.item()
+                    "loss": loss.item(),
+                    "lr": optimizer.param_groups[0]['lr']
                 })
                 tqdm.write(info)
 
@@ -158,7 +160,13 @@ class Predictor:
 #     head_options=dict(head_size=256)
 # )
 if __name__ == "__main__":
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("--model-config", "-c",
+                        required=True, dest="model_config")
+    args = parser.parse_args()
+
     train_config = read_yaml("configs/train.yaml")
-    model_config = read_yaml("configs/db_mobilenet_v2.yml")
+    model_config = read_yaml(args.model_config)
     trainer = Trainer(model_config, train_config)
     trainer.run()
