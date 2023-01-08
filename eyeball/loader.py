@@ -17,8 +17,8 @@ def top_left_letterbox(image):
 
 
 def preprocess_image(image, width, height):
-    image.thumbnail((width, height), resample=Image.BILINEAR)
-    image = top_left_letterbox(image)
+    # image.thumbnail((width, height), resample=Image.BILINEAR)
+    # image = top_left_letterbox(image)
     image = image.resize((width, height), resample=Image.BILINEAR)
     return image
 
@@ -61,6 +61,7 @@ class EyeballDataset(Dataset):
     def __getitem__(self, idx):
         image_file, annotation_file = self.samples[idx]
         image = Image.open(image_file)
+        width, height = image.size
         image = preprocess_image(image, self.image_width, self.image_height)
 
         with open(annotation_file, encoding="utf-8") as f:
