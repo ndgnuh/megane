@@ -1,6 +1,3 @@
-# Rejects wizardry
-# Returns to KISS redundancy
-
 backbone: fpn_mobilenet_v2
 backbone_options:
   output_size: 256
@@ -8,7 +5,7 @@ backbone_options:
 head: DBHead
 head_options:
   input_size: 256
-  activation: SiLU
+  activation: ReLU
 
 processor: DBProcessor
 processor_options: {}

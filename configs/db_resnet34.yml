@@ -1,7 +1,5 @@
 # Rejects wizardry
 # Returns to KISS redundancy
-weights: best.pt
-
 backbone: fpn_resnet34
 backbone_options:
   output_size: 256

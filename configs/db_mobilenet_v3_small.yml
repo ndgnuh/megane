@@ -1,8 +1,4 @@
-# Rejects wizardry
-# Returns to KISS redundancy
-weights: storage/weights/db_shufflenet_v2-best.pt
-
-backbone: fpn_shufflenet_v2_x0_5
+backbone: fpn_mobilenet_v3_small
 backbone_options:
   output_size: 256
 

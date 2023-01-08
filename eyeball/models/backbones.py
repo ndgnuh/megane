@@ -21,7 +21,7 @@ class FPN(nn.Module):
 
         self.in_branch = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(in_channel, out_channel, 1),
+                nn.Conv2d(in_channel, out_channel, 3, padding=1),
                 nn.BatchNorm2d(out_channel),
                 nn.ReLU()
             )
@@ -44,7 +44,6 @@ class FPN(nn.Module):
 
     def forward(self, features):
         features = [layer(f) for layer, f in zip(self.in_branch, features)]
-        # features = [self.upsample(f) for f in features]
         features = [layer(f) for layer, f in zip(self.out_branch, features)]
         features = torch.cat(tuple(features), dim=-3)
         return features
@@ -104,3 +103,8 @@ def fpn_mobilenet_v3_large(output_size: int):
 def fpn_mobilenet_v3_small(output_size: int):
     cnn = models.mobilenet_v3_small().features
     return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
+
+
+def fpn_efficientnet_b3(output_size: int):
+    cnn = models.efficientnet_b3().features
+    return FPNBackbone(cnn, output_size, ['2', '3', '5', '7'])
