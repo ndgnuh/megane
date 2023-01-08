@@ -22,22 +22,29 @@ class FPN(nn.Module):
         self.in_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(in_channel, out_channel, 1),
-                nn.SiLU()
+                nn.BatchNorm2d(out_channel),
+                nn.ReLU()
             )
             for in_channel in in_channels
         ])
-
+        # self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
+        self.upsample = nn.Upsample(
+            scale_factor=2, mode="bilinear", align_corners=True)
         self.out_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(out_channel, mid_channel, 3, padding=1),
-                nn.SiLU(),
-                nn.UpsamplingBilinear2d(scale_factor=2**i)
+                nn.BatchNorm2d(mid_channel),
+                nn.ReLU(),
+                nn.Upsample(scale_factor=2**i,
+                            mode="bilinear",
+                            align_corners=True)
             )
             for (i, mid_channel) in enumerate(mid_channels)
         ])
 
     def forward(self, features):
         features = [layer(f) for layer, f in zip(self.in_branch, features)]
+        # features = [self.upsample(f) for f in features]
         features = [layer(f) for layer, f in zip(self.out_branch, features)]
         features = torch.cat(tuple(features), dim=-3)
         return features
