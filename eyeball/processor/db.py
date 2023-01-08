@@ -37,9 +37,9 @@ def offset_rect(xyxy, r, expand=False):
 
 def generate_db_masks(size, boxes, r=0.4):
     shrink = [offset_rect(box, r, False) for box in boxes]
-    expand = [offset_rect(box, r, True) for box in boxes]
+    # expand = [offset_rect(box, r, True) for box in boxes]
     proba_map = draw_mask_rect(size, shrink)
-    threshold_map = draw_mask_rect(size, expand)
+    threshold_map = draw_mask_rect(size, boxes)
     threshold_map = ImageChops.subtract(threshold_map, proba_map)
     return proba_map, threshold_map
 
