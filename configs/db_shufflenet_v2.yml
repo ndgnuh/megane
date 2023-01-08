@@ -9,7 +9,7 @@ backbone_options:
 head: DBHead
 head_options:
   input_size: 256
-  activation: SiLU
+  activation: ReLU
 
 processor: DBProcessor
 processor_options: {}
