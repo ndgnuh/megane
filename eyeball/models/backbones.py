@@ -22,7 +22,7 @@ class FPN(nn.Module):
         self.in_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(in_channel, out_channel, 1),
-                nn.GELU()
+                nn.SiLU()
             )
             for in_channel in in_channels
         ])
@@ -30,7 +30,7 @@ class FPN(nn.Module):
         self.out_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(out_channel, mid_channel, 3, padding=1),
-                nn.GELU(),
+                nn.SiLU(),
                 nn.UpsamplingBilinear2d(scale_factor=2**i)
             )
             for (i, mid_channel) in enumerate(mid_channels)

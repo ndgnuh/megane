@@ -97,9 +97,16 @@ class DBHead(nn.Module):
             )
             act = getattr(nn, self.activation)()
             layers.extend([conv, act])
-        layers.append(
-            nn.Conv2d(head_size_d4, self.num_classes, 1, bias=False)
-        )
+        layers.extend([
+            nn.Conv2d(head_size_d4, self.num_classes, 1, bias=False),
+            nn.Conv2d(
+                self.num_classes,
+                self.num_classes,
+                3,
+                padding=1,
+                bias=False,
+                groups=self.num_classes)
+        ])
 
         return nn.Sequential(*layers)
 

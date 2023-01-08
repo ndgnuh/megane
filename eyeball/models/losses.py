@@ -9,7 +9,7 @@ class BalancedBCEWithLogitsLoss:
     k: int = 3  # negative / positive ratio
 
     def __call__(self, predicts, targets):
-        target_mask = targets > 0.5
+        target_mask = targets > 0
         n_positive = torch.count_nonzero(target_mask)
         n_negative = torch.min(torch.count_nonzero(
             ~target_mask), self.k * n_positive)
