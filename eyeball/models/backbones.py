@@ -22,7 +22,7 @@ class FPN(nn.Module):
         self.in_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(in_channel, out_channel, 1),
-                nn.GELU(approximate='tanh')
+                nn.GELU()
             )
             for in_channel in in_channels
         ])
@@ -30,7 +30,7 @@ class FPN(nn.Module):
         self.out_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(out_channel, mid_channel, 3, padding=1),
-                nn.GELU(approximate='tanh'),
+                nn.GELU(),
                 nn.UpsamplingBilinear2d(scale_factor=2**i)
             )
             for (i, mid_channel) in enumerate(mid_channels)
@@ -86,4 +86,14 @@ def fpn_shufflenet_v2_x0_5(output_size: int):
 
 def fpn_mobilenet_v2(output_size: int):
     cnn = models.mobilenet_v2().features
+    return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
+
+
+def fpn_mobilenet_v3_large(output_size: int):
+    cnn = models.mobilenet_v3_large().features
+    return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
+
+
+def fpn_mobilenet_v3_small(output_size: int):
+    cnn = models.mobilenet_v3_small().features
     return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
