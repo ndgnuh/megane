@@ -36,6 +36,7 @@ class Trainer(LightningLite):
         )
 
         self.model = detector.Detector(model_config)
+
         self.loss = init.init_from_ns(
             losses,
             model_config['loss'],

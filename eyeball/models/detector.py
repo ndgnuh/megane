@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pytorch_lightning import LightningModule
 from torch import nn, optim
+import torch
 
 from . import backbones, heads, losses
 from .. import processor
@@ -27,3 +28,7 @@ class Detector(nn.Sequential):
             config['processor'],
             config.get('processor_options', {})
         )
+
+        if 'weights' in config:
+            w = torch.load(config['weights'], map_location='cpu')
+            self.model.load_state_dict(w)
