@@ -81,34 +81,16 @@ class DBHead(nn.Module):
         input_size = self.input_size
         head_size_d4 = self.input_size // 4
 
-        layers = [
+        return nn.Sequential(
             nn.Conv2d(input_size, head_size_d4, 3, padding=1, bias=False),
             nn.BatchNorm2d(head_size_d4),
-            nn.ReLU(),
-        ]
-
-        for i in range(self.num_upscales):
-            conv = nn.ConvTranspose2d(
-                head_size_d4,
-                head_size_d4,
-                kernel_size=2,
-                stride=2,
-                bias=False
-            )
-            act = getattr(nn, self.activation)()
-            layers.extend([conv, act])
-        layers.extend([
-            nn.Conv2d(head_size_d4, self.num_classes, 1, bias=False),
-            nn.Conv2d(
-                self.num_classes,
-                self.num_classes,
-                3,
-                padding=1,
-                bias=False,
-                groups=self.num_classes)
-        ])
-
-        return nn.Sequential(*layers)
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(head_size_d4, head_size_d4,
+                               2, stride=2, bias=False),
+            nn.BatchNorm2d(head_size_d4),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(head_size_d4, self.num_classes, 2, stride=2),
+        )
 
 
 def HeadMixin(mode, options):
