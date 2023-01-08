@@ -35,12 +35,27 @@ def offset_rect(xyxy, r, expand=False):
     return x1, y1, x2, y2
 
 
+def get_box_offset(xyxy, r):
+    assert r < 1
+    x1, y1, x2, y2 = xyxy
+    w = x2 - x1
+    h = y2 - y1
+
+    A = w * h
+    L = 2 * (w + h)
+    d = A * (1 - r**2) / L
+    return abs(d)
+
+
 def generate_db_masks(size, boxes, r=0.4):
-    shrink = [offset_rect(box, r, False) for box in boxes]
+    # shrink = [offset_rect(box, r, False) for box in boxes]
     # expand = [offset_rect(box, r, True) for box in boxes]
-    proba_map = draw_mask_rect(size, shrink)
-    threshold_map = draw_mask_rect(size, boxes)
-    threshold_map = ImageChops.subtract(threshold_map, proba_map)
+    offsets = [get_box_offset(box, r) for box in boxes]
+    proba_map = draw_mask_rect(size, boxes)
+    threshold_map = Image.new("L", size, 0)
+    draw = ImageDraw.Draw(threshold_map)
+    for (box, d) in zip(boxes, offsets):
+        draw.rectangle(box, outline=(255,), width=int(d))
     return proba_map, threshold_map
 
 

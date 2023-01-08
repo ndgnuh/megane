@@ -63,10 +63,10 @@ class DBLoss(nn.Module):
         self.r = r
         self.alpha = alpha
         self.beta = beta
-        self.bce = BalancedBCEWithLogitsLoss(k=1)
+        # self.bce = BalancedBCEWithLogitsLoss(k=1)
         # self.bce = BalancedBCELoss(k=3)
-        # self.bce = nn.BCEWithLogitsLoss()
-        # self.bce = nn.BCELoss()
+        self.bce = nn.BCEWithLogitsLoss()
+        self.lbin = nn.BCELoss()
         self.l1 = nn.L1Loss()
 
     # def forward(self,
@@ -83,17 +83,15 @@ class DBLoss(nn.Module):
         # Skip the 1 / (1 + exp(...)) here, because we're using bce with logits
         r = self.r
         bin_map = r * (proba_map - thresh_map)
-        target_bin_map = r * (target_proba_map - target_thresh_map)
+        target_bin_map = (target_proba_map > 0) * 1.0
 
         # Probability map loss
         # Ls = self.bce(torch.sigmoid(proba_map),
         #               torch.sigmoid(target_proba_map))
-        Ls = self.bce((proba_map),
-                      (target_proba_map))
+        Ls = self.bce(proba_map, target_proba_map)
 
         # Binary map loss
-        Lb = self.bce((bin_map),
-                      (target_bin_map))
+        Lb = self.lbin(torch.sigmoid(bin_map), target_bin_map)
         # Lb = self.bce(torch.sigmoid(bin_map),
         #               torch.sigmoid(target_bin_map))
 
