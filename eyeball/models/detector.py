@@ -10,9 +10,18 @@ from ..tools import init
 from ..tools import remember
 
 
+class Normalize(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, image):
+        return (image - 0.5) * 2
+
+
 class Detector(nn.Sequential):
     def __init__(self, config):
         super().__init__()
+        self.norm = Normalize()
         self.backbone = init.init_from_ns(
             backbones,
             config['backbone'],
