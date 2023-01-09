@@ -83,7 +83,8 @@ class DBLoss(nn.Module):
         # Skip the 1 / (1 + exp(...)) here, because we're using bce with logits
         r = self.r
         bin_map = r * (proba_map - thresh_map)
-        target_bin_map = (target_proba_map > 0) * 1.0
+        target_bin_map = ((target_proba_map > 0) &
+                          (target_thresh_map == 0)) * 1.0
 
         # Probability map loss
         # Ls = self.bce(torch.sigmoid(proba_map),
