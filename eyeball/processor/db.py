@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from PIL import Image, ImageDraw, ImageChops
+from PIL import Image, ImageDraw, ImageChops, ImageFilter
 from scipy.special import expit as sigmoid
 import numpy as np
 import cv2
@@ -48,7 +48,7 @@ def get_box_offset(xyxy, r):
 
 
 def generate_db_masks(size, boxes, r=0.4):
-    # shrink = [offset_rect(box, r, False) for box in boxes]
+    # shrink = [offset_rect(box, r/2, False) for box in boxes]
     # expand = [offset_rect(box, r, True) for box in boxes]
     offsets = [get_box_offset(box, r) for box in boxes]
     proba_map = draw_mask_rect(size, boxes)
@@ -56,6 +56,8 @@ def generate_db_masks(size, boxes, r=0.4):
     draw = ImageDraw.Draw(threshold_map)
     for (box, d) in zip(boxes, offsets):
         draw.rectangle(box, outline=(255,), width=int(d))
+
+    threshold_map = threshold_map.filter(ImageFilter.GaussianBlur(0.5))
     return proba_map, threshold_map
 
 
