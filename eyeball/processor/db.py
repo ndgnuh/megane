@@ -48,10 +48,10 @@ def get_box_offset(xyxy, r):
 
 
 def generate_db_masks(size, boxes, r=0.4):
-    # shrink = [offset_rect(box, r/2, False) for box in boxes]
+    shrink = [offset_rect(box, r, False) for box in boxes]
     # expand = [offset_rect(box, r, True) for box in boxes]
     offsets = [get_box_offset(box, r) for box in boxes]
-    proba_map = draw_mask_rect(size, boxes)
+    proba_map = draw_mask_rect(size, shrink)
     threshold_map = Image.new("L", size, 0)
     draw = ImageDraw.Draw(threshold_map)
     for (box, d) in zip(boxes, offsets):
