@@ -5,7 +5,7 @@ import torch
 import icecream
 # from pytorch_lightning import Trainer
 from pytorch_lightning.lite import LightningLite
-from eyeball.loader import EyeballDataset, DataLoader
+from eyeball.loader import EyeballDataset, DataLoader, default_augment
 from eyeball.models import backbones, heads, losses
 from eyeball.models import detector
 from eyeball import processor
@@ -34,6 +34,10 @@ class Trainer(LightningLite):
             "storage/weights/",
             f"{self.name}-latest.pt"
         )
+        self.log_file = path.join(
+            "storage/logs",
+            f"{self.name}.log"
+        )
 
         self.model = detector.Detector(model_config)
 
@@ -60,7 +64,10 @@ class Trainer(LightningLite):
         for k in ["total_steps", "print_every", "validate_every"]:
             setattr(self, k, train_config[k])
 
-        self.train_loader = self.mk_dataloader(train_config['train_data'])
+        self.train_loader = self.mk_dataloader(
+            train_config['train_data'],
+            augment=default_augment
+        )
         self.val_loader = self.mk_dataloader(train_config['validate_data'])
 
     @torch.no_grad()
@@ -117,7 +124,7 @@ class Trainer(LightningLite):
                     "loss": loss.item(),
                     "lr": optimizer.param_groups[0]['lr']
                 })
-                tqdm.write(info)
+                self.print(info)
 
             # validation
             if self.is_matching_step(self.validate_every):
@@ -126,7 +133,7 @@ class Trainer(LightningLite):
                 metrics['step'] = self.global_step
                 metrics['total'] = self.total_steps
                 info = info.format_map(metrics)
-                tqdm.write(info)
+                self.print(info)
                 self.save_weights(self.latest_weight_path)
                 if self.max_score <= metrics['meanap']:
                     self.save_weights(self.best_weight_path)
@@ -134,14 +141,21 @@ class Trainer(LightningLite):
 
     def save_weights(self, path):
         torch.save(self.model.state_dict(), path)
-        tqdm.write(f"Model saved to {path}")
+        self.print(f"Model saved to {path}")
 
-    def mk_dataloader(self, data_root):
+    def print(self, info):
+        tqdm.write(info)
+        with open(self.log_file, "a") as io:
+            io.write(info)
+            io.write("\n")
+
+    def mk_dataloader(self, data_root, augment=None):
         data = EyeballDataset(
             data_root,
             self.model_config['image_width'],
             self.model_config['image_height'],
-            preprocess=self.model.processor.pre
+            preprocess=self.model.processor.pre,
+            augment=augment,
         )
 
         return DataLoader(data, **self.train_config['dataloader_options'])
