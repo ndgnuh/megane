@@ -61,6 +61,22 @@ def contrast(image, p):
     return ImageEnhance.Contrast(image).enhance(p)
 
 
+def channel_swap(image):
+    image = np.array(image)
+    idx = list(range(image.shape[-1]))
+    random.shuffle(idx)
+    image = np.stack([image[..., i] for i in idx], axis=-1)
+    return Image.fromarray(image)
+
+
+def channel_weight(image, ws):
+    image = np.array(image)
+    image = np.stack([image[..., i] * ws[i]
+                      for i in range(image.shape[-1])], axis=-1)
+    image = np.clip(image, 0, 255).round().astype('uint8')
+    return Image.fromarray(image)
+
+
 invert = ImageOps.invert
 
 default_augment = random_apply([
@@ -77,3 +93,12 @@ default_augment = random_apply([
         randomized(salt_and_pepper, np.arange(0.05, 0.1, step=0.01)),
     ])
 ], 0.3)
+
+default_augment = oneof(list(map(sometime, [
+    invert,
+    randomized(brightness, np.arange(0.8, 1.21, step=0.01)),
+    randomized(contrast, np.arange(0.8, 1.21, step=0.01)),
+    randomized(gaussian_noise, np.arange(0.01, 0.1, step=0.01)),
+    randomized(salt_and_pepper, np.arange(0.05, 0.1, step=0.01)),
+    channel_swap
+])))
