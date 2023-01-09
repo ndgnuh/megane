@@ -63,17 +63,40 @@ class DBLoss(nn.Module):
         self.r = r
         self.alpha = alpha
         self.beta = beta
+        self.k = k
         # self.bce = BalancedBCEWithLogitsLoss(k=1)
         # self.bce = BalancedBCELoss(k=3)
         self.bce = nn.BCEWithLogitsLoss()
         self.lbin = nn.BCELoss()
         self.l1 = nn.L1Loss()
 
-    # def forward(self,
-    #             proba_map: Tensor,
-    #             target_proba_map: Tensor,
-    #             thresh_map: Tensor,
-    #             target_thresh_map: Tensor):
+    def balanced_bce(self, predict, target, mask, logits=False):
+        if logits:
+            losses = F.binary_cross_entropy_with_logits(
+                predict,
+                target,
+                reduction="none"
+            )
+        else:
+            losses = F.binary_cross_entropy(
+                predict,
+                target,
+                reduction="none"
+            )
+        neg_mask = ~mask
+        n_positive = torch.count_nonzero(mask)
+        n_negative = torch.min(
+            torch.count_nonzero(neg_mask),
+            self.k * n_positive
+        )
+
+        pos_losses = torch.sum(losses[mask])
+        neg_losses = torch.sum(
+            losses[~neg_mask].sort(descending=True).values[:n_negative]
+        )
+        balanced_loss = (pos_losses + neg_losses) / (n_positive + n_negative)
+        return balanced_loss
+
     def forward(self, outputs, annotations):
         # Compat with training interface
         proba_map, thresh_map = outputs
@@ -84,17 +107,23 @@ class DBLoss(nn.Module):
         r = self.r
         bin_map = r * (proba_map - thresh_map)
         target_bin_map = ((target_proba_map > 0) &
-                          (target_thresh_map == 0)) * 1.0
+                          (target_thresh_map == 0))
 
         # Probability map loss
         # Ls = self.bce(torch.sigmoid(proba_map),
         #               torch.sigmoid(target_proba_map))
-        Ls = self.bce(proba_map, target_proba_map)
+        Ls = self.balanced_bce(
+            torch.sigmoid(proba_map),
+            target_proba_map,
+            target_bin_map
+        )
 
         # Binary map loss
-        Lb = self.lbin(torch.sigmoid(bin_map), target_bin_map)
-        # Lb = self.bce(torch.sigmoid(bin_map),
-        #               torch.sigmoid(target_bin_map))
+        Lb = self.balanced_bce(
+            torch.sigmoid(bin_map),
+            target_bin_map * 1.0,
+            target_bin_map,
+        )
 
         # Threshold map loss
         Lt = self.l1(thresh_map, target_thresh_map)
