@@ -4,42 +4,17 @@ from torch.nn import functional as F
 from dataclasses import dataclass
 
 
-class DiceLoss(nn.Module):
-    '''
-    Loss function from https://arxiv.org/abs/1707.03237,
-    where iou computation is introduced heatmap manner to measure the
-    diversity bwtween tow heatmaps.
-    '''
+class DiceLoss(torch.nn.Module):
+    def init(self):
+        super(diceLoss, self).init()
 
-    def __init__(self, eps=1e-6):
-        super(DiceLoss, self).__init__()
-        self.eps = eps
-
-    def forward(self, pred: torch.Tensor, gt, mask, weights=None):
-        '''
-        pred: one or two heatmaps of shape (N, 1, H, W),
-            the losses of tow heatmaps are added together.
-        gt: (N, 1, H, W)
-        mask: (N, H, W)
-        '''
-        assert pred.dim() == 4, pred.dim()
-        return self._compute(pred, gt, mask, weights)
-
-    def _compute(self, pred, gt, mask, weights):
-        if pred.dim() == 4:
-            pred = pred[:, 0, :, :]
-            gt = gt[:, 0, :, :]
-        assert pred.shape == gt.shape
-        assert pred.shape == mask.shape
-        if weights is not None:
-            assert weights.shape == mask.shape
-            mask = weights * mask
-
-        intersection = (pred * gt * mask).sum()
-        union = (pred * mask).sum() + (gt * mask).sum() + self.eps
-        loss = 1 - 2.0 * intersection / union
-        assert loss <= 1
-        return loss
+    def forward(self, pred, target, smooth=1.0):
+        iflat = pred.contiguous().view(-1)
+        tflat = target.contiguous().view(-1)
+        intersection = (iflat * tflat).sum()
+        A_sum = torch.sum(iflat * iflat)
+        B_sum = torch.sum(tflat * tflat)
+        return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth))
 
 
 @dataclass
@@ -104,7 +79,8 @@ class DBLoss(nn.Module):
         self.k = k
         # self.bce = BalancedBCEWithLogitsLoss(k=1)
         # self.bce = BalancedBCELoss(k=3)
-        self.bce = nn.BCEWithLogitsLoss()
+        # self.bce = nn.BCEWithLogitsLoss()
+        self.bce = DiceLoss()
         self.l1 = nn.SmoothL1Loss()
 
     def balanced_bce(self, predict, target, mask, logits=False):
@@ -152,8 +128,6 @@ class DBLoss(nn.Module):
         Ls = self.bce(
             proba_map,
             target_proba_map,
-            # target_bin_map,
-            # logits=True,
         )
 
         # Binary map loss
