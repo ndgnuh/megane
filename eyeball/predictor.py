@@ -33,7 +33,7 @@ class Predictor:
         # To batch
         image = TF.to_tensor(image).unsqueeze(0)
         logits, threshold_maps = self.model(image)
-        proba_maps = torch.sigmoid(logits)
+        proba_maps = torch.sigmoid(logits * 50)
 
         # Unbatch and to numpy
         proba_maps = proba_maps.squeeze(0)
@@ -61,7 +61,7 @@ class Predictor:
             results.extend(results_)
 
         if return_maps:
-            results = (results, proba_maps, threshold_maps)
+            results = (results, (logits, threshold_maps))
         return results
 
     def visualize_result(self, image, results, color=(255, 0, 0), stroke=2):
