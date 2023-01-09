@@ -38,7 +38,7 @@ class EyeballDataset(Dataset):
         image_width: int,
         image_height: int,
         preprocess: Optional[Callable] = None,
-        augment: Optional[Callable] = default_augment
+        augment: Optional[Callable] = None
     ):
         super().__init__()
         self.samples = self.get_samples()
