@@ -112,10 +112,11 @@ class DBLoss(nn.Module):
         # Probability map loss
         # Ls = self.bce(torch.sigmoid(proba_map),
         #               torch.sigmoid(target_proba_map))
-        Ls = self.balanced_bce(
-            torch.sigmoid(proba_map),
+        Ls = self.bce(
+            proba_map,
             target_proba_map,
-            target_bin_map
+            # target_bin_map,
+            # logits=True,
         )
 
         # Binary map loss
