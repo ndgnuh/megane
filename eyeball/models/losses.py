@@ -85,9 +85,9 @@ class DBLoss(nn.Module):
             )
         neg_mask = ~mask
         n_positive = torch.count_nonzero(mask)
-        n_negative = torch.min(
+        n_negative = min(
             torch.count_nonzero(neg_mask),
-            self.k * n_positive
+            int(self.k * n_positive)
         )
 
         pos_losses = torch.sum(losses[mask])
@@ -112,8 +112,8 @@ class DBLoss(nn.Module):
         # Probability map loss
         # Ls = self.bce(torch.sigmoid(proba_map),
         #               torch.sigmoid(target_proba_map))
-        Ls = self.bce(
-            torch.sigmoid(proba_map),
+        Ls = self.l1(
+            proba_map,
             target_proba_map,
             # target_bin_map,
             # logits=True,
