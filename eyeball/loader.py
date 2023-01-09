@@ -1,9 +1,16 @@
 from torch.utils.data import DataLoader, Dataset
 from typing import Callable, Optional, Tuple
 from os import path, listdir
-from PIL import Image
+from PIL import Image, ImageOps
 import json
 from .tools import remember
+from .aug import default_augment as default_augment_
+import random
+
+
+def default_augment(image, a):
+    return default_augment_(image), a
+
 
 IMG_EXTS = Image.registered_extensions()
 
@@ -24,14 +31,14 @@ def preprocess_image(image, width, height):
 
 
 class EyeballDataset(Dataset):
-    @remember
+    @ remember
     def __init__(
         self,
         root: str,
         image_width: int,
         image_height: int,
         preprocess: Optional[Callable] = None,
-        augment: Optional[Callable] = None
+        augment: Optional[Callable] = default_augment
     ):
         super().__init__()
         self.samples = self.get_samples()
