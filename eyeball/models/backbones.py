@@ -28,8 +28,6 @@ class FPN(nn.Module):
             for in_channel in in_channels
         ])
         # self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
-        self.upsample = nn.Upsample(
-            scale_factor=2, mode="bilinear", align_corners=True)
         self.out_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(out_channel, mid_channel, 3, padding=1),
