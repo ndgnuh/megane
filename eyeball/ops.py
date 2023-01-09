@@ -35,8 +35,9 @@ def xyxy_to_ccwh(box):
     return cx, cy, w, h
 
 
-def preprocess_image(image, width, height):
-    image = top_left_letterbox(image)
+def preprocess_image(image, width, height, letterbox=False):
+    if letterbox:
+        image = top_left_letterbox(image)
     # image.thumbnail((width, height), resample=Image.BILINEAR)
     image = image.resize((width, height), resample=Image.BILINEAR)
     return image

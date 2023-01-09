@@ -63,3 +63,8 @@ class Predictor:
         if return_maps:
             results = (results, proba_maps, threshold_maps)
         return results
+
+    def visualize_result(self, image, results, color=(255, 0, 0), stroke=2):
+        image = image.copy()
+        boxes = [tuple(map(int, r['box'])) for r in results]
+        return ops.draw_rects(image, boxes, outline=color, width=stroke)
