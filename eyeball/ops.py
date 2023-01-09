@@ -87,7 +87,8 @@ def mask_to_boxes(proba_map: np.ndarray,
                   min_box_score: int = 0.6,
                   expand_ratio: float = 1.5,
                   threshold: float = 0.02):
-    mask = (255 * (proba_map > threshold)).astype('uint8')
+    mask = proba_map > (proba_map.mean() + proba_map.std() * 1.5)
+    mask = mask * 1.0
     image_height, image_width = mask.shape
 
     # mask: h * w
