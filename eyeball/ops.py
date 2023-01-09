@@ -1,4 +1,7 @@
 import json
+import numpy as np
+import cv2
+from PIL import Image
 
 
 def draw_rects(image, rects, **kwargs):
@@ -76,3 +79,35 @@ def offset_rect(xyxy, r, expand=False):
     x2 = x2 - d
     y2 = y2 - d
     return x1, y1, x2, y2
+
+
+def mask_to_boxes(proba_map: np.ndarray,
+                  min_box_size: int = 10,
+                  min_box_score: int = 0.6,
+                  expand_ratio: float = 1.5,
+                  threshold: float = 0.02):
+    mask = (255 * (proba_map > threshold)).astype('uint8')
+    image_height, image_width = mask.shape
+
+    # mask: h * w
+    stats = cv2.connectedComponentsWithStats(mask.astype('uint8'))
+    boxes, scores = [], []
+    for (x1, y1, w, h, s) in stats[2]:
+        # Check for too-small boxes
+        x2 = x1 + w
+        y2 = y1 + h
+        if x2 - x1 < min_box_size or y2 - y1 < min_box_size or w >= 0.95 * image_width or h >= 0.95 * image_height:
+            continue
+
+        score = proba_map[y1:y2, x1:x2].mean()
+
+        if np.isnan(score) or score <= min_box_score:
+            continue
+
+        box = (x1 / image_width, y1 / image_height,
+               x2 / image_width, y2 / image_height)
+        x1, y1, x2, y2 = offset_rect(box, expand_ratio)
+        scores.append(score)
+        boxes.append(box)
+
+    return boxes, scores

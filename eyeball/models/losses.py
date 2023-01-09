@@ -66,7 +66,7 @@ class DBLoss(nn.Module):
         self.k = k
         # self.bce = BalancedBCEWithLogitsLoss(k=1)
         # self.bce = BalancedBCELoss(k=3)
-        self.bce = nn.BCEWithLogitsLoss()
+        self.bce = nn.BCELoss()
         self.lbin = nn.BCELoss()
         self.l1 = nn.L1Loss()
 
@@ -113,7 +113,7 @@ class DBLoss(nn.Module):
         # Ls = self.bce(torch.sigmoid(proba_map),
         #               torch.sigmoid(target_proba_map))
         Ls = self.bce(
-            proba_map,
+            torch.sigmoid(proba_map),
             target_proba_map,
             # target_bin_map,
             # logits=True,
