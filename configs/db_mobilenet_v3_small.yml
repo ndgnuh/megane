@@ -1,3 +1,5 @@
+weights: storage/weights/db_mobilenet_v3_small-best.pt
+
 backbone: fpn_mobilenet_v3_small
 backbone_options:
   output_size: 256

@@ -1,21 +1,20 @@
 optimizer: AdamW
 optimizer_options:
-  lr: 0.0007
+  lr: 0.000099
 
 lr_scheduler: CosineAnnealingLR
 lr_scheduler_options:
-  T_max: 10_000
+  T_max: 50000
 
-total_steps: 10_000
-print_every: 100
-validate_every: 500
+total_steps: 50000
+print_every: 500
+validate_every: 2500
 
-train_data: funsd/train/
-validate_data: funsd/test/
-test_data: funsd/test/
+train_data: arxiv/train/
+validate_data: arxiv/val/
+test_data: arxiv/test/
 dataloader_options:
-  batch_size: 2
-  num_workers: 6
+  batch_size: 1
 
 
 lightning_options:

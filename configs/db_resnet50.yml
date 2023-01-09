@@ -1,6 +1,4 @@
-# Rejects wizardry
-# Returns to KISS redundancy
-weights: best.pt
+weights: storage/weights/db_resnet50-latest.pt
 
 backbone: fpn_resnet50
 backbone_options:
