@@ -1,3 +1,4 @@
+import random
 from eyeball.config import read_yaml, get_name
 from argparse import ArgumentParser
 from itertools import cycle
@@ -137,7 +138,9 @@ class Trainer(LightningLite):
             aloss = self.loss(aoutputs, annotations)
             self.backward(aloss)
             data_grad = image.grad.data
-            pimage = fgsm_attack(image, 0.15, data_grad)
+            # epsilon = random.random() * 3
+            epsilon = 0.1
+            pimage = fgsm_attack(image, epsilon, data_grad)
 
             # Set the model to train mode
             model.train()
@@ -192,7 +195,9 @@ class Trainer(LightningLite):
             augment=augment,
         )
 
-        return DataLoader(data, **self.train_config['dataloader_options'])
+        dataloader_options = self.train_config['dataloader_options']
+        dataloader_options.set_default("shuffle", True)
+        return DataLoader(data, **dataloader_options)
 
 
 class Predictor:
