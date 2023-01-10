@@ -4,6 +4,12 @@ from .tools.dict import munchify
 from argparse import Namespace
 import logging
 
+# In package setting
+try:
+    from .eyeball_configs import configs
+except Exception:
+    pass
+
 
 def read_yaml(file):
     with open(file) as f:

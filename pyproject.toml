@@ -25,6 +25,6 @@ dependencies = [
 author = "Hung Nguyen"
 email = "ndgnuh@protonmail.com"
 
-[tool.setuptools]
-packages = ["eyeball"]
-
+[tool.setuptools.package-dir]
+eyeball = "eyeball"
+"eyeball.eyeball_configs" =  "configs"
