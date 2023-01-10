@@ -5,7 +5,7 @@ import logging
 from os import path, listdir
 
 thisdir = path.dirname(__file__)
-config_path = path.join(thisdir, "eyeball_configs")
+config_path = path.join(thisdir, "config_files")
 config_files = [
     "db_efficientnet_b3.yml",
     "db_mobilenet_v2.yml",
@@ -13,7 +13,6 @@ config_files = [
     "db_mobilenet_v3_small.yml",
     "db_resnet18.yml",
     "db_resnet34.yml",
-    "db_resnet50_small.yml",
     "db_resnet50.yml",
     "db_shufflenet_v2.yml",
 ]
