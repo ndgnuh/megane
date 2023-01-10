@@ -12,6 +12,7 @@ license = {text = "Apache-2.0"}
 dependencies = [
     "pyyaml",
     "numpy",
+    "gdown",
     "opencv-python",
     "Pillow",
     "torch",
@@ -27,4 +28,4 @@ email = "ndgnuh@protonmail.com"
 
 [tool.setuptools.package-dir]
 eyeball = "eyeball"
-"eyeball.eyeball_configs" =  "configs"
+"eyeball.configs" =  "configs"

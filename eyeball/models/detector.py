@@ -8,6 +8,13 @@ from . import backbones, heads, losses
 from .. import processor
 from ..tools import init
 from ..tools import remember
+import gdown
+
+
+def load_pt(path, **k):
+    if path.startswith("http"):
+        path = gdown.download(path)
+    return torch.load(path, **k)
 
 
 class Normalize(nn.Module):
@@ -41,7 +48,7 @@ class Detector(nn.Sequential):
 
         if 'weights' in config:
             try:
-                w = torch.load(config['weights'], map_location='cpu')
+                w = load_pt(config['weights'], map_location='cpu')
                 self.load_state_dict(w)
             except Exception:
                 print_exc()

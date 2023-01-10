@@ -1,14 +1,26 @@
 import yaml
-from os import path
 from .tools.dict import munchify
 from argparse import Namespace
 import logging
+from os import path, listdir
 
-# In package setting
-try:
-    from .eyeball_configs import configs
-except Exception:
-    pass
+thisdir = path.dirname(__file__)
+config_path = path.join(thisdir, "eyeball_configs")
+config_files = [
+    "db_efficientnet_b3.yml",
+    "db_mobilenet_v2.yml",
+    "db_mobilenet_v3_large.yml",
+    "db_mobilenet_v3_small.yml",
+    "db_resnet18.yml",
+    "db_resnet34.yml",
+    "db_resnet50_small.yml",
+    "db_resnet50.yml",
+    "db_shufflenet_v2.yml",
+]
+config_files = [path.join(config_path, file) for file in config_files]
+configs = {
+    path.splitext(path.basename(c))[0]: c for c in config_files
+}
 
 
 def read_yaml(file):
