@@ -19,6 +19,17 @@ from os import path
 icecream.install()
 
 
+def fgsm_attack(image, epsilon, data_grad):
+    # Collect the element-wise sign of the data gradient
+    sign_data_grad = data_grad.sign()
+    # Create the perturbed image by adjusting each pixel of the input image
+    perturbed_image = image + epsilon*sign_data_grad
+    # Adding clipping to maintain [0,1] range
+    perturbed_image = torch.clamp(perturbed_image, 0, 1)
+    # Return the perturbed image
+    return perturbed_image
+
+
 class Trainer(LightningLite):
     def __init__(self, model_config, train_config):
         lightning_options = train_config.get('lightning_options', {})
@@ -113,6 +124,29 @@ class Trainer(LightningLite):
             outputs = model(image)
             loss = self.loss(outputs, annotations)
             self.backward(loss)
+            optimizer.step()
+            self.lr_scheduler.step()
+
+            # Adversarial training
+            image.requires_grad = True  # Collect input gradient
+
+            # Generate adversarial example
+            # model.eval() # TODO: DB doesn't generate threshold map in eval mode
+            model.eval()
+            aoutputs = model(image, head_options=dict(returns_threshold=True))
+            aloss = self.loss(aoutputs, annotations)
+            self.backward(aloss)
+            data_grad = image.grad.data
+            pimage = fgsm_attack(image, 0.15, data_grad)
+
+            # Set the model to train mode
+            model.train()
+            optimizer.zero_grad()
+            outputs = model(pimage)
+            aloss = self.loss(outputs, annotations)
+            self.backward(aloss)
+
+            # Update
             optimizer.step()
             self.lr_scheduler.step()
 

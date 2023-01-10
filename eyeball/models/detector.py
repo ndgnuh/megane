@@ -25,7 +25,7 @@ class Normalize(nn.Module):
         return (image - 0.5) * 2
 
 
-class Detector(nn.Sequential):
+class Detector(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.norm = Normalize()
@@ -52,3 +52,9 @@ class Detector(nn.Sequential):
                 self.load_state_dict(w)
             except Exception:
                 print_exc()
+
+    def forward(self, image, head_options={}):
+        image = self.norm(image)
+        features = self.backbone(image)
+        outputs = self.head(features, **head_options)
+        return outputs

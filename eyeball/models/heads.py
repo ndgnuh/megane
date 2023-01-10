@@ -69,8 +69,8 @@ class DBHead(nn.Module):
         self.prob_head = self.make_branch()
         self.thres_head = self.make_branch()
 
-    def forward(self, features):
-        if self.training:
+    def forward(self, features, returns_threshold=False):
+        if self.training or returns_threshold:
             thres = self.thres_head(features)
         else:
             thres = None
