@@ -13,7 +13,7 @@ import gdown
 
 def load_pt(path, **k):
     if path.startswith("http"):
-        path = gdown.download(path)
+        path = gdown.cached_download(path)
     return torch.load(path, **k)
 
 
