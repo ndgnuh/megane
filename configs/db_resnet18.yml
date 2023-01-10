@@ -1,6 +1,4 @@
-# Rejects wizardry
-# Returns to KISS redundancy
-weights: storage/weights/db_resnet18-latest.pt
+weights: https://github.com/ndgnuh/eyeball/releases/download/weights/db_resnet18-best.pt
 
 backbone: fpn_resnet18
 backbone_options:

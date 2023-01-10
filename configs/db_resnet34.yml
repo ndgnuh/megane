@@ -1,4 +1,4 @@
-weights: storage/weights/db_resnet34-latest.pt
+weights: https://github.com/ndgnuh/eyeball/releases/download/weights/db_resnet34-best.pt
 
 backbone: fpn_resnet34
 backbone_options:

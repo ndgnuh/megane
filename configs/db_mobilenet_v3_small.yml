@@ -1,4 +1,4 @@
-weights: storage/weights/db_mobilenet_v3_small-best.pt
+weights: https://github.com/ndgnuh/eyeball/releases/download/weights/db_mobilenet_v3_small-best.pt
 
 backbone: fpn_mobilenet_v3_small
 backbone_options:

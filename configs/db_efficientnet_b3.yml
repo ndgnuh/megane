@@ -1,3 +1,5 @@
+weights: https://github.com/ndgnuh/eyeball/releases/download/weights/db_efficientnet_b3-best.pt
+
 backbone: fpn_efficientnet_b3
 backbone_options:
   output_size: 256

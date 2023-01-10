@@ -1,4 +1,4 @@
-weights: storage/weights/db_resnet50-latest.pt
+weights: https://github.com/ndgnuh/eyeball/releases/download/weights/db_resnet50-best.pt
 
 backbone: fpn_resnet50
 backbone_options:
