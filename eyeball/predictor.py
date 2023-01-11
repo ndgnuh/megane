@@ -23,7 +23,7 @@ class Predictor:
     def train(self):
         self.model = self.model.train()
 
-    def predict_single(self, image, return_maps=False):
+    def predict_single(self, image, return_maps=False, **options):
         width, height = image.size
         image = ops.preprocess_image(
             image,
@@ -43,7 +43,8 @@ class Predictor:
         results = []
         for (class_idx, proba_map) in enumerate(proba_maps):
             boxes, scores = ops.mask_to_boxes(
-                proba_map
+                proba_map,
+                **options
             )
             results_ = [
                 {
