@@ -1,4 +1,5 @@
-from PIL import Image, ImageOps, ImageColor, ImageEnhance, ImageChops
+from PIL import Image, ImageOps, ImageColor, ImageEnhance, ImageChops, ImageFilter
+from io import BytesIO
 import random
 import numpy as np
 
@@ -94,11 +95,59 @@ default_augment = random_apply([
     ])
 ], 0.3)
 
-default_augment = oneof(list(map(sometime, [
+
+def salt_and_pepper(image, prob):
+    w, h = image.size
+    mask = np.random.rand(h, w, 1) <= prob
+    pors = (np.random.rand(h, w, 1) < 0.5) * 255
+    image = np.array(image)
+    image = pors * mask + (1 - mask) * image
+    image = image.round().astype('uint8')
+    return Image.fromarray(image)
+
+
+def gaussian_noise(image, level):
+    noise = Image.effect_noise(image.size, 255).convert("RGB")
+    return ImageChops.blend(image, noise, level)
+
+
+def emboss(image):
+    return image.filter(ImageFilter.EMBOSS)
+
+
+def edges(image):
+    return image.filter(ImageFilter.FIND_EDGES)
+
+
+def sharpen(image):
+    return image.filter(ImageFilter.SHARPEN)
+
+
+def smooth(image):
+    return image.filter(ImageFilter.SMOOTH)
+
+
+def smooth_more(image):
+    return image.filter(ImageFilter.SMOOTH_MORE)
+
+
+def compress_jpeg(image, quality: int):
+    io = BytesIO()
+    image.save(io, "JPEG", quality=quality)
+    return Image.open(io)
+
+
+default_augment = sometime(oneof([
     invert,
-    # randomized(brightness, np.arange(0.8, 1.21, step=0.01)),
-    # randomized(contrast, np.arange(0.8, 1.21, step=0.01)),
+    randomized(brightness, np.arange(0.8, 1.21, step=0.01)),
+    randomized(contrast, np.arange(0.8, 1.21, step=0.01)),
+    randomized(compress_jpeg, range(60, 100)),
     # randomized(gaussian_noise, np.arange(0.01, 0.1, step=0.01)),
     # randomized(salt_and_pepper, np.arange(0.05, 0.1, step=0.01)),
+    emboss,
+    edges,
+    sharpen,
+    smooth,
+    smooth_more,
     channel_swap
-])))
+]))
