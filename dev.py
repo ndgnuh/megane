@@ -196,7 +196,7 @@ class Trainer(LightningLite):
         )
 
         dataloader_options = self.train_config['dataloader_options']
-        dataloader_options.set_default("shuffle", True)
+        dataloader_options.setdefault("shuffle", True)
         return DataLoader(data, **dataloader_options)
 
 
