@@ -1,21 +1,21 @@
 import random
-from eyeball.config import read_yaml, get_name
+from megane.config import read_yaml, get_name
 from argparse import ArgumentParser
 from itertools import cycle
 import torch
 import icecream
 # from pytorch_lightning import Trainer
 from pytorch_lightning.lite import LightningLite
-from eyeball.loader import EyeballDataset, DataLoader, default_augment
-from eyeball.models import backbones, heads, losses
-from eyeball.models import detector
-from eyeball import processor
-from eyeball.tools import meanap as MaP
-from eyeball.tools import stats
+from megane.loader import EyeballDataset, DataLoader, default_augment
+from megane.models import backbones, heads, losses
+from megane.models import detector
+from megane import processor
+from megane.tools import meanap as MaP
+from megane.tools import stats
 from torch import optim, nn
 from tqdm import tqdm
 from argparse import Namespace
-from eyeball.tools import init
+from megane.tools import init
 from os import path
 icecream.install()
 

@@ -3,9 +3,9 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "eyeball"
+name = "megane"
 version="0.2.3"
-description = "Text detector with DBNet"
+description = "Text detector with DBNet (and RetineNet, maybe)"
 readme = "README.md"
 requires-python = ">=3.7"
 license = {text = "Apache-2.0"}
@@ -27,5 +27,5 @@ author = "Hung Nguyen"
 email = "ndgnuh@protonmail.com"
 
 [tool.setuptools.package-dir]
-eyeball = "eyeball"
-"eyeball.config_files" = "configs"
+megane = "megane"
+"megane.config_files" = "configs"
