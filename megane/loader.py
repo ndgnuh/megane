@@ -30,8 +30,8 @@ def preprocess_image(image, width, height):
     return image
 
 
-class EyeballDataset(Dataset):
-    @ remember
+class MeganeDataset(Dataset):
+    @remember
     def __init__(
         self,
         root: str,
