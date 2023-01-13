@@ -106,21 +106,29 @@ def build_db_target(
     thresh_map = np.zeros((image_height, image_width), dtype='float32')
     thresh_mask = np.ones((image_height, image_width), dtype='float32')
     for polygon, shrink, expand in zip(polygons, shrinked_polygons, expanded_polygons):
-        cv2.fillConvexPoly(proba_map, shrink, (255,))
+        cv2.fillConvexPoly(proba_map, shrink, (1,))
         cv2.fillConvexPoly(proba_mask, polygon, (0,))
-        cv2.fillConvexPoly(thresh_map, expand, (255,))
+        cv2.fillConvexPoly(thresh_map, expand, (1,))
         cv2.fillConvexPoly(thresh_map, shrink, (0,))
         cv2.fillConvexPoly(thresh_mask, expand, (0,))
 
     # Distance map as threshold map
-    thresh_map = cv2.distanceTransform(thresh_map.astype(
-        'uint8'), distanceType=cv2.DIST_C, maskSize=3)
+    thresh_map = cv2.distanceTransform(
+        thresh_map,
+        distanceType=cv2.DIST_L2,
+        maskSize=3
+    )
     # To a [0, 1] vector
     thresh_map = (thresh_map - thresh_map.min()) / \
         (thresh_map.max() - thresh_map.min())
     # To a [min thesh, max_thresh vector]
     thresh_map = (max_thresh - min_thresh) * thresh_map + min_thresh
+
+    # Convert to uint8 255
+    proba_map = (proba_map * 255).round().astype('uint8')
+    proba_mask = (proba_mask * 255).round().astype('uint8')
     thresh_map = (thresh_map * 255).round().astype('uint8')
+    thresh_mask = (thresh_mask * 255).round().astype('uint8')
 
     return (
         Image.fromarray(proba_map),
