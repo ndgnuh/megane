@@ -67,7 +67,7 @@ def offset_poly(poly, offset=1):
 
 
 def build_db_target(
-    polygons: List[Tuple[Tuple[int]]],
+    polygons: np.ndarray,
     image_width: int,
     image_height: int,
     shrink_ratio: float = 0.4,
@@ -75,13 +75,15 @@ def build_db_target(
     max_thresh: float = 0.7,
     min_box_size: int = 3,
 ):
+    # Polygons must be in the shape: [n, 4, 2]
     # Denormalize polygon
     polygons = polygons.copy()
     polygons[:, :, 0] *= image_width
     polygons[:, :, 1] *= image_height
 
     # Shrinks
-    box_sizes = np.linalg.norm(polygons[:, 2, :] - polygons[:, 0, :], axis=-1)
+    # TODO: mask small boxes
+    # box_sizes = np.linalg.norm(polygons[:, 2, :] - polygons[:, 0, :], axis=-1)
     shrink_distances = np.array([
         (1 - shrink_ratio**2) * polygon_area(poly) / polygon_perimeter(poly)
         for poly in polygons
@@ -101,34 +103,37 @@ def build_db_target(
     expanded_polygons = expanded_polygons.round().astype(int)
 
     # Draw maps and masks
-    proba_map = np.zeros((image_height, image_width), dtype='float32')
-    proba_mask = np.ones((image_height, image_width), dtype='float32')
-    thresh_map = np.zeros((image_height, image_width), dtype='float32')
-    thresh_mask = np.ones((image_height, image_width), dtype='float32')
-    for polygon, shrink, expand in zip(polygons, shrinked_polygons, expanded_polygons):
-        cv2.fillConvexPoly(proba_map, shrink, (1,))
-        cv2.fillConvexPoly(proba_mask, polygon, (0,))
-        cv2.fillConvexPoly(thresh_map, expand, (1,))
-        cv2.fillConvexPoly(thresh_map, shrink, (0,))
-        cv2.fillConvexPoly(thresh_mask, expand, (0,))
+    proba_map = np.zeros((image_height, image_width), dtype='uint8')
+    proba_mask = np.ones((image_height, image_width), dtype='uint8')
+    thresh_map = np.zeros((image_height, image_width), dtype='uint8')
+    thresh_mask = np.ones((image_height, image_width), dtype='uint8')
+
+    # Proba map/mask
+    cv2.fillPoly(proba_map, shrinked_polygons, (255,))
+    cv2.fillPoly(proba_mask, shrinked_polygons, (0,))
+
+    # Threshold map/mask
+    cv2.fillPoly(thresh_map, expanded_polygons, (255,))
+    cv2.fillPoly(thresh_map, shrinked_polygons, (0,))
+    cv2.fillPoly(thresh_mask, expanded_polygons, (0,))
 
     # Distance map as threshold map
+    # thresh_map = (thresh_map * 255).round().astype('uint8')
     thresh_map = cv2.distanceTransform(
         thresh_map,
         distanceType=cv2.DIST_L2,
         maskSize=3
     )
+
     # To a [0, 1] vector
     thresh_map = (thresh_map - thresh_map.min()) / \
         (thresh_map.max() - thresh_map.min())
     # To a [min thesh, max_thresh vector]
     thresh_map = (max_thresh - min_thresh) * thresh_map + min_thresh
-
     # Convert to uint8 255
-    proba_map = (proba_map * 255).round().astype('uint8')
-    proba_mask = (proba_mask * 255).round().astype('uint8')
     thresh_map = (thresh_map * 255).round().astype('uint8')
-    thresh_mask = (thresh_mask * 255).round().astype('uint8')
+
+    # ic(thresh_map.shape, thresh_map.dtype, thresh_map.max(), thresh_map.min())
 
     return (
         Image.fromarray(proba_map),
