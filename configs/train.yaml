@@ -10,9 +10,9 @@ total_steps: 50000
 print_every: 500
 validate_every: 2500
 
-train_data: arxiv/train/
-validate_data: arxiv/val/
-test_data: arxiv/test/
+train_data: toybox/word-level-megane/
+validate_data: toybox/word-level-megane/
+test_data: toybox/word-level-megane/
 dataloader_options:
   batch_size: 1
 
