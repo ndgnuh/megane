@@ -42,16 +42,3 @@ class DBHead(nn.Module):
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(head_size_d4, self.num_classes, 2, stride=2),
         )
-
-
-class DBNet(nn.Module):
-    def __init__(self, fpn, input_size: int):
-        super().__init__()
-        self.fpn = fpn
-        self.head = DBHead(input_size)
-
-    def forward(self, image):
-        features = self.fpn(image)
-        features = torch.cat(features, dim=-3)
-        proba_maps, threshold_maps = self.head(features)
-        return proba_maps, threshold_maps

@@ -47,9 +47,15 @@ class FPN(nn.Module):
 
 
 class FPNBackbone(nn.Module):
-    def __init__(self, cnn: nn.Module, out_channel: int, layers: List[str]):
+    def __init__(self, preset: str, out_channel: int):
         super().__init__()
-        imm_layers = {layer: str(i) for i, layer in enumerate(layers)}
+        fpn_config = presets[preset]
+        feature_path = fpn_config.get('feature_path', None)
+        cnn = getattr(models, preset)(num_classes=1)
+        if feature_path is not None:
+            cnn = getattr(cnn, feature_path)
+        imm_layers = {layer: str(i)
+                      for i, layer in enumerate(fpn_config['layers'])}
         self.cnn = IntermediateLayerGetter(cnn, imm_layers)
 
         with torch.no_grad():
@@ -66,42 +72,37 @@ class FPNBackbone(nn.Module):
         return features
 
 
-def fpn_resnet18(output_size: int):
-    cnn = models.resnet18()
-    return FPNBackbone(cnn, output_size, ["layer1", "layer2", "layer3", "layer4"])
-
-
-def fpn_resnet34(output_size: int):
-    cnn = models.resnet18()
-    return FPNBackbone(cnn, output_size, ["layer1", "layer2", "layer3", "layer4"])
-
-
-def fpn_resnet50(output_size: int):
-    cnn = models.resnet18()
-    return FPNBackbone(cnn, output_size, ["layer1", "layer2", "layer3", "layer4"])
-
-
-def fpn_shufflenet_v2_x0_5(output_size: int):
-    cnn = models.shufflenet_v2_x0_5()
-    layers = ['maxpool', 'stage2', 'stage3', 'conv5']
-    return FPNBackbone(cnn, output_size, layers)
-
-
-def fpn_mobilenet_v2(output_size: int):
-    cnn = models.mobilenet_v2().features
-    return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
-
-
-def fpn_mobilenet_v3_large(output_size: int):
-    cnn = models.mobilenet_v3_large().features
-    return FPNBackbone(cnn, output_size, ['3', '6', '12', '16'])
-
-
-def fpn_mobilenet_v3_small(output_size: int):
-    cnn = models.mobilenet_v3_small().features
-    return FPNBackbone(cnn, output_size,  ['1', '3', '8', '12'])
-
-
-def fpn_efficientnet_b3(output_size: int):
-    cnn = models.efficientnet_b3().features
-    return FPNBackbone(cnn, output_size, ['2', '3', '5', '7'])
+presets = {
+    "resnet18": dict(
+        layers=["layer1", "layer2", "layer3", "layer4"],
+        feature_path=None
+    ),
+    "resnet34": dict(
+        layers=["layer1", "layer2", "layer3", "layer4"],
+        feature_path=None
+    ),
+    "resnet50": dict(
+        layers=["layer1", "layer2", "layer3", "layer4"],
+        feature_path=None
+    ),
+    "shufflenet_v2_x0_5": dict(
+        layers=["maxpool", "stage2", "stage3", "conv5"],
+        feature_path=None
+    ),
+    "mobilenet_v2": dict(
+        layers=["3", "6", "12", "16"],
+        feature_path="features"
+    ),
+    "mobilenet_v3_large": dict(
+        layers=["3", "6", "12", "16"],
+        feature_path="features"
+    ),
+    "mobilenet_v3_small": dict(
+        layers=["1", "3", "8", "12"],
+        feature_path="features"
+    ),
+    "efficientnet_b3": dict(
+        layers=["2", "3", "5", "7"],
+        feature_path="features"
+    ),
+}
