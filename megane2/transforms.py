@@ -61,10 +61,11 @@ class DBPreprocess:
 
         # To tensor
         image = to_tensor(image)
-        targets = [to_tensor(trg) for trg in targets]
-        targets[1] = targets[1].type(torch.bool)
-        targets[3] = targets[3].type(torch.bool)
-        return image, targets
+        proba_maps = torch.tensor(targets[0]).type(torch.bool)
+        threshold_maps = torch.tensor(targets[2]) / 255
+        proba_masks = torch.tensor(targets[1]).type(torch.bool)
+        theshold_masks = torch.tensor(targets[3]).type(torch.bool)
+        return image, (proba_maps, proba_masks, threshold_maps, theshold_masks)
 
 
 @dataclass
