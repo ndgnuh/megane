@@ -7,3 +7,4 @@ pytorch_lightning
 gdown
 icecream
 opencv-python
+shapely

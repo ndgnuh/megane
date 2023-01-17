@@ -1,8 +1,10 @@
 import json
 import os
+import torch
+import numpy as np
 from os import path
 from PIL import Image
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from typing import Optional, Callable
 
 
@@ -36,3 +38,19 @@ class MeganeDataset(Dataset):
         if self.transform is not None:
             image, annotation = self.transform(image, annotation)
         return image, annotation
+
+
+def megane_dataloader(
+    root: str,
+    transform: Optional[Callable] = None,
+    batch_size: int = 1,
+    shuffle: bool = False,
+    num_workers: Optional[int] = 0
+):
+    dataset = MeganeDataset(root, transform=transform)
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers
+    )

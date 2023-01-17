@@ -32,6 +32,8 @@ class DBPreprocess:
     min_box_size: int = 10
 
     def __call__(self, image: Image.Image, annotation):
+        import torch
+        from torchvision.transforms.functional import to_tensor
         polygons = np.array(annotation['polygons'])
         labels = np.array(annotation['labels'])
 
@@ -56,6 +58,12 @@ class DBPreprocess:
             np.stack([target[i] for target in targets])
             for i in range(4)
         ]
+
+        # To tensor
+        image = to_tensor(image)
+        targets = [to_tensor(trg) for trg in targets]
+        targets[1] = targets[1].type(torch.bool)
+        targets[3] = targets[3].type(torch.bool)
         return image, targets
 
 
