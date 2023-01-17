@@ -144,7 +144,12 @@ def build_db_target(
     )
 
 
-def mask_to_polygons(proba_map, min_box_size: int = 10, min_score: float = 0.6, expand_ratio: float = 1.5):
+def mask_to_polygons(
+    proba_map: np.ndarray,
+    min_box_size: float = 10.0,
+    min_score: float = 0.6,
+    expand_ratio: float = 1.5
+):
     h, w = proba_map.shape
     mask = (proba_map > 0).astype('uint8')
     polygons = []
@@ -177,10 +182,11 @@ def mask_to_polygons(proba_map, min_box_size: int = 10, min_score: float = 0.6, 
         polygons.append(polygon)
         scores.append(score)
 
-    # polygon: [4, 2] -> [n, 4, 2]
-    polygons = np.stack(polygons, axis=0).astype('float32')
-    polygons[:, :, 0] /= w
-    polygons[:, :, 1] /= h
+    # normalize polygons
+    polygons = [
+        [(x / w, y / h) for (x, y) in points]
+        for points in polygons
+    ]
     return polygons, scores
 
 

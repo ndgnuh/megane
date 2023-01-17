@@ -87,7 +87,4 @@ class DBPostprocess:
             scores.extend(scores_)
             labels.extend([label] * len(scores_))
 
-        polygons = np.stack(polygons, axis=0)
-        scores = np.array(scores)
-        labels = np.array(labels)
         return polygons, labels, scores
