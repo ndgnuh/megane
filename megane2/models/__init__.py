@@ -6,9 +6,9 @@ from .fpn import FPNBackbone
 
 
 class DBNet(nn.Module):
-    def __init__(self, fpn_preset: str, hidden_size: int):
+    def __init__(self, backbone: str, hidden_size: int):
         super().__init__()
-        self.fpn = FPNBackbone(fpn_preset, hidden_size)
+        self.fpn = FPNBackbone(backbone, hidden_size)
         self.head = DBHead(hidden_size)
 
     def forward(self, image):
