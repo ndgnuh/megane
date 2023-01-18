@@ -1,3 +1,6 @@
+# the argument are sorted so that we can do something like this:
+# outputs = model(inputs)
+# loss = criterion(*outputs, *labels)
 from torch import Tensor
 from torch.nn import functional as F
 from dataclasses import dataclass
@@ -14,9 +17,9 @@ class DBLoss:
     def __call__(
         self,
         proba_maps: Tensor,  # Float
+        threshold_maps: Tensor,  # Float
         target_proba_maps: Tensor,  # Bool
         proba_masks: Tensor,  # Bool
-        threshold_maps: Tensor,  # Float
         target_threshold_maps: Tensor,  # Bool
         threshold_masks: Tensor,  # Bool
     ):
