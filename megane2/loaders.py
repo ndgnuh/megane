@@ -25,7 +25,9 @@ class MeganeDataset(Dataset):
 
     def load_sample(self, idx):
         annotation = self.samples[idx]
-        image = Image.open(path.join(self.root, annotation['image_path']))
+        image = Image.open(
+            path.join(self.root, annotation['image_path'])
+        ).convert("RGB")
         try:
             annotation.pop("width")
             annotation.pop("height")
