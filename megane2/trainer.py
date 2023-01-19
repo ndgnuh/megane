@@ -1,9 +1,12 @@
+import cv2
 import torch
 from megane2.loaders import megane_dataloader
 from megane2 import transforms, losses, models, scores
 from pytorch_lightning.lite import LightningLite
 from torch import optim
 from tqdm import tqdm
+from . import visualize
+import random
 
 
 def cycle(dataloader, total_steps):
@@ -25,7 +28,7 @@ class Trainer(LightningLite):
         val_data: str,
         total_steps: int = 10_000,
         validate_every: int = 100,
-        batch_size: int = 1,
+        batch_size: int = 4,
         num_workers: int = 1,
     ):
         super().__init__(accelerator="auto")
@@ -112,11 +115,16 @@ class Trainer(LightningLite):
         model = self.setup(self.model)
         criterion = self.criterion
 
+        num_batches = len(val_loader)
+        visualize_index = random.choice(range(num_batches))
+
+        count = 0
         for images, annotations in val_loader:
             outputs = model(images)
             loss = criterion(*outputs, *annotations)
 
             # Check accuracy
+            # The first map is the probability map
             proba_maps = torch.sigmoid(outputs[0])
             target_proba_maps = annotations[0]
             for proba_map, target_proba_map in zip(proba_maps, target_proba_maps):
@@ -128,5 +136,19 @@ class Trainer(LightningLite):
                 )
                 print(polygons, target_polygons)
                 score = scores.f1_score(polygons, target_polygons)
+
+            if visualize_index == count:
+                proba_map = proba_maps[0][0].cpu().numpy()
+                target_proba_map = torch.sigmoid(
+                    proba_maps[0][0]).cpu().numpy()
+                cv2.imshow("proba_map", proba_map)
+                import numpy as np
+                np.save("proba_map.npy", proba_map)
+                np.save("proba_map.npy", proba_map)
+                # cv2.imwrite("proba_map.jpg", proba_map)
+                cv2.waitKey(25)
+
+            count = count + 1
+
         # THIS IS A DRAFT
         return dict(f1score=score)

@@ -6,9 +6,12 @@ def get_polygons_iou(p1, p2):
         p1 = Polygon(p1)
     if not isinstance(p2, Polygon):
         p2 = Polygon(p2)
-    inter = p1.intersection(p2).area
-    uni = p1.union(p2).area
-    return inter / uni
+    try:
+        inter = p1.intersection(p2).area
+        uni = p1.union(p2).area
+        return inter / (uni + 1e-6)
+    except Exception:
+        return 0
 
 
 def get_tp_fp_fn(predicts, targets, iou_threshold: float = 0.5):
