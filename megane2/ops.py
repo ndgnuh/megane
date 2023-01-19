@@ -151,7 +151,7 @@ def mask_to_polygons(
     expand_ratio: float = 1.5
 ):
     h, w = proba_map.shape
-    mask = (proba_map > 0).astype('uint8')
+    mask = (proba_map > 0.2).astype('uint8')
     polygons = []
     scores = []
     cnts, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
