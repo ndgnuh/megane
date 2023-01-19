@@ -1,0 +1,11 @@
+backbone: mobilenet_v3_large
+hidden_size: 96
+num_classes: 1
+
+# Pre/Post processing
+image_width: 768
+image_height: 768
+shrink_ratio: 0.4
+expand_ratio: 1.5
+min_box_size: 3
+min_score:  0.7

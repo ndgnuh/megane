@@ -27,9 +27,13 @@ class Resize:
 @dataclass
 class DBPreprocess:
     shrink_ratio: float = 0.4
-    min_thresh: float = 0.3
-    max_thresh: float = 0.7
     min_box_size: int = 10
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            **{k: config[k] for k in ['shrink_ratio', 'min_box_size']}
+        )
 
     def __call__(self, image: Image.Image, annotation):
         import torch
@@ -88,3 +92,9 @@ class DBPostprocess:
             labels.extend([label] * len(scores_))
 
         return polygons, labels, scores
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            **{k: config[k] for k in ['expand_ratio', 'min_box_size', 'min_score']}
+        )
