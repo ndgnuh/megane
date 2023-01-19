@@ -1,4 +1,4 @@
-from . import ops
+from . import ops, configs
 from dataclasses import dataclass
 from PIL import Image
 from typing import List, Callable
@@ -26,18 +26,21 @@ class Resize:
 
 @dataclass
 class DBPreprocess:
+    image_width: int
+    image_height: int
     shrink_ratio: float = 0.4
     min_box_size: int = 10
 
     @classmethod
     def from_config(cls, config):
-        return cls(
-            **{k: config[k] for k in ['shrink_ratio', 'min_box_size']}
-        )
+        keys = ["image_width", "image_height", "shrink_ratio", "min_box_size"]
+        print(config)
+        return configs.init_from_config(cls, config, keys)
 
     def __call__(self, image: Image.Image, annotation):
         import torch
         from torchvision.transforms.functional import to_tensor
+        image = image.resize((self.image_width, self.image_height))
         polygons = np.array(annotation['polygons'])
         labels = np.array(annotation['labels'])
 
@@ -72,7 +75,7 @@ class DBPreprocess:
         return image, (proba_maps, proba_masks, threshold_maps, theshold_masks)
 
 
-@dataclass
+@ dataclass
 class DBPostprocess:
     expand_ratio: float = 10
     min_box_size: int = 10
@@ -93,8 +96,12 @@ class DBPostprocess:
 
         return polygons, labels, scores
 
-    @classmethod
+    @ classmethod
     def from_config(cls, config):
         return cls(
-            **{k: config[k] for k in ['expand_ratio', 'min_box_size', 'min_score']}
+            **{k: config[k] for k in [
+                'expand_ratio',
+                'min_box_size',
+                'min_score'
+            ]}
         )

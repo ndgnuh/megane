@@ -23,8 +23,7 @@ def cycle(dataloader, total_steps):
 class Trainer(LightningLite):
     def __init__(
         self,
-        image_width: int,
-        image_height: int,
+        model_config: dict,
         train_data: str,
         val_data: str,
         total_steps: int = 10_000,
@@ -38,8 +37,10 @@ class Trainer(LightningLite):
 
         # Model
         self.criterion = losses.DBLoss()
-        self.model = models.DBNet("mobilenet_v3_large", 96)
-        self.post_processor = transforms.DBPostprocess(expand_ratio=1.5)
+        self.model = models.DBNet.from_config(model_config)
+        self.post_processor = transforms.DBPostprocess.from_config(
+            model_config
+        )
         self.optimizer = optim.AdamW(self.model.parameters(), lr=1e-3)
         self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer,
@@ -48,10 +49,7 @@ class Trainer(LightningLite):
         )
 
         # datasets
-        transform = transforms.Compose([
-            transforms.Resize(image_width, image_height),
-            transforms.DBPreprocess(),
-        ])
+        transform = transforms.DBPreprocess.from_config(model_config)
 
         self.train_loader = megane_dataloader(
             train_data,

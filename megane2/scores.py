@@ -14,7 +14,7 @@ def get_polygons_iou(p1, p2):
         return 0
 
 
-def get_tp_fp_fn(predicts, targets, iou_threshold: float = 0.5):
+def get_tp_fp_fn(predicts, targets, iou_threshold: float = 0.8):
     num_predicts = len(predicts)
     num_targets = len(targets)
 
