@@ -33,6 +33,7 @@ def get_option_shell(args):
                         required=True)
     parser.add_argument("--train-data", required=True)
     parser.add_argument("--val-data", required=True)
+    parser.add_argument("--batch-size", default=4, type=int, required=True)
     parser.add_argument("--total-steps", "-N", type=int, default=1000)
     parser.add_argument("--num-workers", type=int, default=1)
     parser.add_argument("--validate-every", type=int, default=10)

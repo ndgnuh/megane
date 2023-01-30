@@ -10,6 +10,7 @@ python train.py -c {model_config} \\
     --train-data {train_data} \\
     --val-data {val_data} \\
     --total-steps {total_steps} \\
+    --batch-size {batch_size} \\
     --num-workers {num_workers} \\
     --validate-every {validate_every}
 """.format_map(options)
@@ -18,7 +19,9 @@ if not script_file.endswith(".sh"):
     script_file = f"{script_file}.sh"
 
 with open(script_file, "w") as f:
+    f.write("")
+chmod(script_file, 0o755)
+with open(script_file, "w", encoding="utf-8") as f:
     f.write(script)
 
-chmod(script_file, 755)
 print(script)

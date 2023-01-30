@@ -35,6 +35,9 @@ class Trainer(LightningLite):
     ):
         super().__init__(accelerator="auto")
         self.name = path.splitext(path.basename(model_config))[0]
+        self.best_weight_path = path.join(
+            "storage", "weights", f"{self.name}.pt"
+        )
         self.model_config = read_config(model_config)
         self.total_steps = total_steps
         self.validate_every = validate_every
@@ -120,8 +123,8 @@ class Trainer(LightningLite):
                 info = [f"{k}: {v}" for k, v in metrics.items()]
                 tqdm.write(" - ".join(info))
                 if changed:
-                    torch.save(model.state_dict(), "storage/weights/best.pt")
-                    tqdm.write("Best model saved to storage/weights/best.pt")
+                    torch.save(model.state_dict(), self.best_weight_path)
+                    tqdm.write(f"Best model saved to {self.best_weight_path}")
 
     @torch.no_grad()
     def validate(self):
