@@ -20,10 +20,10 @@ def init_from_config(cls, config: Dict, keys: List, **options: Dict):
     # Because options[k] is eager
     kwargs = {}
     for k, v in options.items():
-        if k not in configs:
-            configs[k] = options[v]
+        if k not in config:
+            kwargs[k] = v
 
-    kwargs = {
-        for k in keys
-    }
+    for k, v in config.items():
+        kwargs[k] = v
+
     return cls(**kwargs)
