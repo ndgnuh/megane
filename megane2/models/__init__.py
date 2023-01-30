@@ -6,10 +6,19 @@ from .fpn import FPNBackbone
 
 
 class DBNet(nn.Module):
-    def __init__(self, backbone: str, hidden_size: int, num_classes: int = 1):
+    def __init__(
+        self,
+        backbone: str,
+        hidden_size: int,
+        num_classes: int = 1,
+        weights: str = None,
+    ):
         super().__init__()
         self.fpn = FPNBackbone(backbone, hidden_size)
         self.head = DBHead(hidden_size, num_classes=num_classes)
+
+        if weights is not None:
+            self.load_state_dict(torch.load(weights, map_location=True))
 
     def forward(self, image):
         features = self.fpn(image)
@@ -21,4 +30,5 @@ class DBNet(nn.Module):
     def from_config(cls, config):
         return cls(hidden_size=config['hidden_size'],
                    backbone=config['backbone'],
-                   num_classes=config['num_classes'])
+                   num_classes=config['num_classes'],
+                   weights=config.get("weights", None))
