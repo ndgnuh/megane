@@ -128,7 +128,7 @@ def build_db_target(
         cv2.fillPoly(canvas, [sh], (0,))
         canvas = cv2.distanceTransform(canvas, cv2.DIST_L2, cv2.DIST_MASK_3)
         masked = canvas[canvas > 0]
-        if masked.numel() == 0:
+        if masked.size == 0:
             continue
         max_dist = masked.max()
         min_dist = masked.min()
