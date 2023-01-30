@@ -19,11 +19,10 @@ def init_from_config(cls, config: Dict, keys: List, **options: Dict):
     # Can't use config.get(k, options[k])
     # Because options[k] is eager
     kwargs = {}
-    for k, v in options.items():
+    for k in keys:
         if k not in config:
-            kwargs[k] = v
-
-    for k, v in config.items():
-        kwargs[k] = v
+            kwargs[k] = options[k]
+        else:
+            kwargs[k] = config[k]
 
     return cls(**kwargs)
