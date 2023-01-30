@@ -39,7 +39,7 @@ def offset_poly(poly, offset=1):
         vx, vy = vy, -vx
 
         # normalize
-        length = (vx**2 + vy**2)**0.5
+        length = (vx**2 + vy**2)**0.5 + 1e-6
         vx, vy = vx / length, vy / length
 
         # Offset line
@@ -56,7 +56,7 @@ def offset_poly(poly, offset=1):
     for i in range(n):
         (x1, y1, x2, y2) = offset_lines[i]
         (x3, y3, x4, y4) = offset_lines[(i + 1) % n]
-        deno = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        deno = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4) + 1e-6
         x = ((x1 * y2 - y1 * x2) * (x3 - x4) -
              (x1 - x2) * (x3 * y4 - x4 * y3)) / deno
         y = ((x1 * y2 - y1 * x2) * (y3 - y4) -
@@ -128,11 +128,12 @@ def build_db_target(
         cv2.fillPoly(canvas, [sh], (0,))
         canvas = cv2.distanceTransform(canvas, cv2.DIST_L2, cv2.DIST_MASK_3)
         masked = canvas[canvas > 0]
-        if masked.size == 0:
+        if masked.size < 1:
             continue
         max_dist = masked.max()
         min_dist = masked.min()
-        canvas = ((canvas - min_dist) / (max_dist - min_dist)) * (canvas > 0)
+        canvas = ((canvas - min_dist) /
+                  (max_dist - min_dist + 1e-6)) * (canvas > 0)
         thresh_map = np.clip(thresh_map + canvas, 0, 1)
 
     thresh_map = (255 * thresh_map).astype('uint8')
