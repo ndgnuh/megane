@@ -2,11 +2,11 @@ from shapely.geometry import Polygon
 
 
 def get_polygons_iou(p1, p2):
-    if not isinstance(p1, Polygon):
-        p1 = Polygon(p1)
-    if not isinstance(p2, Polygon):
-        p2 = Polygon(p2)
     try:
+        if not isinstance(p1, Polygon):
+            p1 = Polygon(p1)
+        if not isinstance(p2, Polygon):
+            p2 = Polygon(p2)
         inter = p1.intersection(p2).area
         uni = p1.union(p2).area
         return inter / (uni + 1e-6)
