@@ -1,22 +1,20 @@
 import questionary as Q
+from argparse import ArgumentParser
 from os import path
 from megane2.trainer import Trainer
-from megane2.configs import read_config
 
 
-def ask_int(prompt, default):
-    q = Q.text(prompt, validate=str.isnumeric, default=str(default))
-    return int(q.ask())
+def get_option_interactive():
 
+    def ask_int(prompt, default):
+        q = Q.text(prompt, validate=str.isnumeric, default=str(default))
+        return int(q.ask())
 
-def ask_file(prompt, default=""):
-    q = Q.path(prompt, validate=path.isfile, default=str(default))
-    return q.ask()
-
-
-def main():
+    def ask_file(prompt, default=""):
+        q = Q.path(prompt, validate=path.isfile, default=str(default))
+        return q.ask()
     options = dict()
-    options["model_config"] = read_config(ask_file("Model config (.yml):"))
+    options["model_config"] = ask_file("Model config (.yml):")
     options["train_data"] = ask_file("Train data index:")
     train_data_dir = path.dirname(options["train_data"])
     options["val_data"] = ask_file("Validate data index:", train_data_dir)
@@ -25,8 +23,43 @@ def main():
     options["total_steps"] = ask_int("Total training steps:", 1000)
     options["validate_every"] = ask_int("Validate every:", 50)
 
+    return options
+
+
+def get_option_shell(args):
+    parser = ArgumentParser()
+    parser.add_argument("-c",
+                        dest="model_config",
+                        help="Model configuration",
+                        required=True)
+    parser.add_argument("--train-data", required=True)
+    parser.add_argument("--val-data", required=True)
+    parser.add_argument("--total-steps", "-N", type=int, default=1000)
+    parser.add_argument("--num-workers", type=int, default=1)
+    parser.add_argument("--validate-every", type=int, default=10)
+
+    options = parser.parse_args(args)
+    options = {k: getattr(options, k) for k in vars(options)}
+    print(options)
+    return options
+
+
+def main():
+    parser = ArgumentParser()
+    parser.add_argument("-i",
+                        action="store_true",
+                        help="interactive configuration",
+                        dest="interactive",
+                        default=False)
+
+    args, unknowns = parser.parse_known_args()
+    if args.interactive:
+        options = get_option_interactive()
+    else:
+        options = get_option_shell(unknowns)
+
     trainer = Trainer(**options)
-    trainer.run()
+    trainer.train()
 
 
 if __name__ == "__main__":

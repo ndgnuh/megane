@@ -1,13 +1,15 @@
 import cv2
 import torch
+import random
+from os import path
 from megane2.loaders import megane_dataloader
 from megane2 import transforms, losses, models, scores
 from pytorch_lightning.lite import LightningLite
 from torch import optim
 from tqdm import tqdm
 from . import visualize
-import random
 from . import stats
+from .configs import read_config
 
 
 def cycle(dataloader, total_steps):
@@ -23,7 +25,7 @@ def cycle(dataloader, total_steps):
 class Trainer(LightningLite):
     def __init__(
         self,
-        model_config: dict,
+        model_config: str,
         train_data: str,
         val_data: str,
         total_steps: int = 10_000,
@@ -32,14 +34,16 @@ class Trainer(LightningLite):
         num_workers: int = 1,
     ):
         super().__init__(accelerator="auto")
+        self.name = path.splitext(path.basename(model_config))[0]
+        self.model_config = read_config(model_config)
         self.total_steps = total_steps
         self.validate_every = validate_every
 
         # Model
         self.criterion = losses.DBLoss()
-        self.model = models.DBNet.from_config(model_config)
+        self.model = models.DBNet.from_config(self.model_config)
         self.post_processor = transforms.DBPostprocess.from_config(
-            model_config
+            self.model_config
         )
         self.optimizer = optim.AdamW(self.model.parameters(), lr=1e-3)
         self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -49,7 +53,7 @@ class Trainer(LightningLite):
         )
 
         # datasets
-        transform = transforms.DBPreprocess.from_config(model_config)
+        transform = transforms.DBPreprocess.from_config(self.model_config)
 
         self.train_loader = megane_dataloader(
             train_data,

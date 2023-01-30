@@ -8,3 +8,4 @@ gdown
 icecream
 opencv-python
 shapely
+questionary
