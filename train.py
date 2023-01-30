@@ -1,7 +1,6 @@
 import questionary as Q
 from argparse import ArgumentParser
 from os import path
-from megane2.trainer import Trainer
 
 
 def get_option_interactive():
@@ -45,6 +44,7 @@ def get_option_shell(args):
 
 
 def main():
+    from megane2.trainer import Trainer
     parser = ArgumentParser()
     parser.add_argument("-i",
                         action="store_true",
