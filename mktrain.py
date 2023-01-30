@@ -23,5 +23,5 @@ with open(script_file, "w") as f:
 chmod(script_file, 0o755)
 with open(script_file, "w", encoding="utf-8") as f:
     f.write(script)
-
+print(f"Script written to {script_file}:")
 print(script)
