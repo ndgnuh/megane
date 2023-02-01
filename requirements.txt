@@ -9,3 +9,4 @@ icecream
 opencv-python
 shapely
 questionary
+matplotlib

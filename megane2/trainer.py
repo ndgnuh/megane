@@ -6,6 +6,7 @@ from megane2.loaders import megane_dataloader
 from megane2 import transforms, losses, models, scores
 from pytorch_lightning.lite import LightningLite
 from torch import optim
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 from . import visualize
 from . import stats
@@ -161,8 +162,8 @@ class Trainer(LightningLite):
                 proba_map = proba_maps[0][0].cpu().numpy()
                 target_proba_map = torch.sigmoid(
                     proba_maps[0][0]).cpu().numpy()
-                cv2.imshow("proba_map", proba_map)
-                cv2.waitKey(25)
+                plt.imshow(proba_map)
+                plt.show()
 
             count = count + 1
 
