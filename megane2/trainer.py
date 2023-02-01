@@ -10,6 +10,7 @@ from tqdm import tqdm
 from . import visualize
 from . import stats
 from .configs import read_config
+from .augments import Augment
 
 
 def cycle(dataloader, total_steps):
@@ -60,7 +61,10 @@ class Trainer(LightningLite):
 
         self.train_loader = megane_dataloader(
             train_data,
-            transform=transform,
+            transform=transforms.Compose([
+                Augment.from_string("yes"),
+                transform
+            ]),
             batch_size=batch_size,
             num_workers=num_workers,
         )
