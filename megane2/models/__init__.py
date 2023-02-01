@@ -18,7 +18,7 @@ class DBNet(nn.Module):
         self.head = DBHead(hidden_size, num_classes=num_classes)
 
         if weights is not None:
-            self.load_state_dict(torch.load(weights, map_location=True))
+            self.load_state_dict(torch.load(weights, map_location="cpu"))
 
     def forward(self, image):
         features = self.fpn(image)
