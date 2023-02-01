@@ -10,4 +10,4 @@ opencv-python
 shapely
 questionary
 matplotlib
-albumentations
+albumentations --no-binary qudida,albumentations
