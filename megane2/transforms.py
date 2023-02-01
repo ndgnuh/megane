@@ -78,7 +78,8 @@ class DBPreprocess:
 class DBPostprocess:
     expand_ratio: float = 10
     min_box_size: int = 10
-    min_score: float = 0.5
+    min_score: float = 0.6
+    min_threshold: float = 0.7
 
     def __call__(self, proba_maps: np.ndarray):
         polygons, labels, scores, angles = [], [], [], []
@@ -87,7 +88,8 @@ class DBPostprocess:
                 proba_map,
                 expand_ratio=self.expand_ratio,
                 min_box_size=self.min_box_size,
-                min_score=self.min_score
+                min_score=self.min_score,
+                min_threshold=self.min_threshold
             )
             polygons.extend(polygons_)
             angles.extend(angles_)
@@ -99,7 +101,8 @@ class DBPostprocess:
     @ classmethod
     def from_config(cls, config):
         return cls(
-            **{k: config[k] for k in [
+            min_threshold=config.get('min_threshold', 0.7),
+            ** {k: config[k] for k in [
                 'expand_ratio',
                 'min_box_size',
                 'min_score'

@@ -1,4 +1,5 @@
 backbone: mobilenet_v3_large
+head: dbnet
 hidden_size: 96
 num_classes: 1
 
@@ -8,4 +9,5 @@ image_height: 768
 shrink_ratio: 0.4
 expand_ratio: 1.5
 min_box_size: 3
-min_score:  0.7
+min_score:  0.6
+min_threshold: 0.7

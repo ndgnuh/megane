@@ -150,11 +150,12 @@ def build_db_target(
 def mask_to_polygons(
     proba_map: np.ndarray,
     min_box_size: float = 10.0,
-    min_score: float = 0.7,
-    expand_ratio: float = 1.5
+    min_score: float = 0.6,
+    expand_ratio: float = 1.5,
+    min_threshold: float = 0.7
 ):
     h, w = proba_map.shape
-    mask = (proba_map > min_score).astype('uint8')
+    mask = (proba_map > min_threshold).astype('uint8')
     polygons = []
     angles = []
     scores = []
