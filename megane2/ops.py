@@ -193,7 +193,7 @@ def mask_to_polygons(
     return polygons, scores
 
 
-def simplify_contour(contour, n_corners=4):
+def simplify_contour(contour, min_corners=4, max_corners=6):
     '''
     Binary searches best `epsilon` value to force contour
         approximation contain exactly `n_corners` points.
@@ -203,7 +203,7 @@ def simplify_contour(contour, n_corners=4):
 
     :returns: Simplified contour in successful case. Otherwise returns initial contour.
     '''
-    if contour.shape[0] == n_corners:
+    if contour.shape[0] >= min_corners and contour.shape[0] <= max_corners:
         return contour, True
 
     n_iter, max_iter = 0, 100
@@ -218,9 +218,9 @@ def simplify_contour(contour, n_corners=4):
         eps = k*cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, eps, True)
 
-        if len(approx) > n_corners:
+        if len(approx) > max_corners:
             lb = (lb + ub)/2.
-        elif len(approx) < n_corners:
+        elif len(approx) < min_corners:
             ub = (lb + ub)/2.
         else:
             return approx, True
