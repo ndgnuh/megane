@@ -151,10 +151,10 @@ class Trainer(LightningLite):
             proba_maps = torch.sigmoid(outputs[0])
             target_proba_maps = annotations[0]
             for proba_map, target_proba_map in zip(proba_maps, target_proba_maps):
-                polygons, _, _ = self.post_processor(
+                polygons, _, _, _ = self.post_processor(
                     proba_map.cpu().numpy()
                 )
-                target_polygons, _, _ = self.post_processor(
+                target_polygons, _, _, _ = self.post_processor(
                     target_proba_map.cpu().numpy().astype('float32')
                 )
                 avg_f1_score.append(scores.f1_score(polygons, target_polygons))
