@@ -34,7 +34,6 @@ class DBPreprocess:
     @classmethod
     def from_config(cls, config):
         keys = ["image_width", "image_height", "shrink_ratio", "min_box_size"]
-        print(config)
         return configs.init_from_config(cls, config, keys)
 
     def __call__(self, image: Image.Image, annotation):
@@ -82,19 +81,20 @@ class DBPostprocess:
     min_score: float = 0.5
 
     def __call__(self, proba_maps: np.ndarray):
-        polygons, labels, scores = [], [], []
+        polygons, labels, scores, angles = [], [], [], []
         for label, proba_map in enumerate(proba_maps):
-            polygons_, scores_ = ops.mask_to_polygons(
+            polygons_, scores_, angles_ = ops.mask_to_polygons(
                 proba_map,
                 expand_ratio=self.expand_ratio,
                 min_box_size=self.min_box_size,
                 min_score=self.min_score
             )
             polygons.extend(polygons_)
+            angles.extend(angles_)
             scores.extend(scores_)
             labels.extend([label] * len(scores_))
 
-        return polygons, labels, scores
+        return polygons, angles, labels, scores
 
     @ classmethod
     def from_config(cls, config):

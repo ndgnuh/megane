@@ -150,12 +150,13 @@ def build_db_target(
 def mask_to_polygons(
     proba_map: np.ndarray,
     min_box_size: float = 10.0,
-    min_score: float = 0.6,
+    min_score: float = 0.7,
     expand_ratio: float = 1.5
 ):
     h, w = proba_map.shape
-    mask = (proba_map > 0.2).astype('uint8')
+    mask = (proba_map > min_score).astype('uint8')
     polygons = []
+    angles = []
     scores = []
     cnts, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     for cnt in cnts:
@@ -163,16 +164,16 @@ def mask_to_polygons(
         if cnt.shape[0] < 4:
             continue
 
-        polygon, success = simplify_contour(cnt)
-        if not success:
-            continue
+        # Angle is deegree
+        # Convert to a rotated rectangle
+        xy, wh, angle = cv2.minAreaRect(cnt)
+        polygon = cv2.boxPoints((xy, wh, angle)).round().astype(int)
 
         # Score thresholding
         score = polygon_score(proba_map, polygon)
         if score < min_score:
             continue
 
-        polygon = polygon[:, 0, :]
         # Filter small polygon
         A = polygon_area(polygon)
         if np.power(A, 2) < min_box_size:
@@ -183,6 +184,7 @@ def mask_to_polygons(
         D = expand_ratio * A / L
         polygon = offset_poly(polygon, D)
         polygons.append(polygon)
+        angles.append(angle)
         scores.append(score)
 
     # normalize polygons
@@ -190,7 +192,7 @@ def mask_to_polygons(
         [(x / w, y / h) for (x, y) in points]
         for points in polygons
     ]
-    return polygons, scores
+    return polygons, scores, angles
 
 
 def simplify_contour(contour, min_corners=4, max_corners=6):

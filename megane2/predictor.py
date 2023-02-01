@@ -30,5 +30,5 @@ class Predictor:
         pt_image = TF.to_tensor(image).unsqueeze(0)
         proba_maps, _ = self.model(pt_image)
         proba_maps = torch.sigmoid(proba_maps).squeeze(0).cpu().numpy()
-        polygons, labels, scores = self.post_processor(proba_maps)
-        return polygons, labels, scores, proba_maps
+        polygons, angles, labels, scores = self.post_processor(proba_maps)
+        return polygons, angles, labels, scores, proba_maps
