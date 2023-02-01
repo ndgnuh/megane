@@ -163,7 +163,7 @@ class Trainer(LightningLite):
                 target_proba_map = torch.sigmoid(
                     proba_maps[0][0]).cpu().numpy()
                 plt.imshow(proba_map)
-                plt.show()
+                plt.show(wait=False)
 
             count = count + 1
 

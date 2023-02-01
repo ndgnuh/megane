@@ -1,12 +1,12 @@
 import json
 import os
+import numpy as np
 from os import path
 from PIL import Image
 from torchvision.datasets import VisionDataset
 from torch.utils.data import Dataset, DataLoader
 from typing import Optional, Callable
 from functools import lru_cache
-from numpy import np
 
 
 def image_from_bytes(bs):
