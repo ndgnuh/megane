@@ -6,6 +6,81 @@ from torchvision.datasets import VisionDataset
 from torch.utils.data import Dataset, DataLoader
 from typing import Optional, Callable
 from functools import lru_cache
+from numpy import np
+
+
+def image_from_bytes(bs):
+    from io import BytesIO
+    io = BytesIO(bs)
+    return Image.open(io)
+
+
+def load_sample_lmdb(sample: tuple):
+    env, idx = sample
+    with env as txn:
+        image = image_from_bytes(txn.get("image_{idx:04d}".encode()))
+        labels = np.frombytes(txn.get("labels_{idx:04d}".encode()))
+        polygons = np.frombytes(txn.get("labels_{idx:04d}".encode()))
+
+    return image, labels, polygons
+
+
+def load_sample_megane(sample):
+    with open(sample, encoding="utf-8") as f:
+        json.parse(f)
+    root = path.dirname(sample)
+    image = Image.open(path.join(root, annotation['image_path']))
+    image = image.convert("RGB")
+    try:
+        annotation.pop("width")
+        annotation.pop("height")
+    except Exception:
+        pass
+    return image, annotation
+
+
+def load_sample_labelme(sample):
+    with open(sample, encoding='utf-8') as f:
+        data = json.load(f)
+    shapes = data['shapes']
+    width = data['imageWidth']
+    height = data['imageHeight']
+    image_path = data['imagePath']
+    image_data = data['imageData']
+
+    polygons = []
+    labels = []
+    for shape in shapes:
+        if shape['shape_type'] == 'rectangle':
+            [x1, y1], [x2, y2] = shape['points']
+            polygon = [
+                (x1 / width, y1 / height),
+                (x2 / width, y1 / height),
+                (x2 / width, y2 / height),
+                (x1 / width, y2 / height),
+            ]
+        elif shape['shape_type'] == 'polygon':
+            polygon = [
+                (x / width, y / height)
+                for (x, y) in shape['points']
+            ]
+
+        labels.append(shape['label'])
+        polygons.append(polygon)
+    label_maps = sorted(list(set(list(labels))))
+    labels = [label_maps.index(label) for label in labels]
+
+    annotation = dict(
+        polygons=polygons,
+        labels=labels,
+        image_path=image_path,
+    )
+    if image_data is not None:
+        image = image_from_bytes(b64decode(image_data))
+    else:
+        image_path = path.join(path.dirname(file), image_path)
+        image = Image.open(image_path)
+    return image, annotation
 
 
 class IndexedImageFolder(VisionDataset):
