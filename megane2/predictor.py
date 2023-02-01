@@ -1,6 +1,7 @@
 import cv2
 import torch
 from megane2.loaders import megane_dataloader
+from megane2.configs import read_config
 from megane2 import transforms, models
 from torchvision.transforms import functional as TF
 from PIL import Image
@@ -9,30 +10,19 @@ from PIL import Image
 class Predictor:
     def __init__(
         self,
-        backbone: str,
-        hidden_size: int,
-        image_width: int,
-        image_height: int,
-        num_classes: int = 1,
-        min_score: float = 0.8,
-        weights: str = None,
+        model_config: str,
         device: str = None
     ):
-        self.model = models.DBNet(backbone, hidden_size).eval()
-        self.image_width = image_width
-        self.image_height = image_height
-
-        if weights is not None:
-            print("Loaded", weights)
-            self.model.load_state_dict(torch.load(weights, map_location="cpu"))
-
+        if isinstance(model_config, str):
+            model_config = read_config(model_config)
+        self.model = models.DBNet.from_config(model_config)
+        self.post_processor = transforms.DBPostprocess.from_config(
+            model_config
+        )
+        self.image_width = model_config["image_width"]
+        self.image_height = model_config["image_height"]
         if device is not None:
             self.model.to(device)
-
-        self.post_processor = transforms.DBPostprocess(
-            expand_ratio=1.5,
-            min_score=min_score
-        )
 
     @torch.no_grad()
     def predict(self, image: Image.Image):
