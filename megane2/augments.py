@@ -27,12 +27,6 @@ def default_augment(p=0.3):
             A.ToGray(p=p),
         ]),
 
-        # Overlays
-        # Fog, snow, sunflare are disabled
-        # due to deadlock bug and readability
-        # https://github.com/albumentations-team/albumentations/issues/361
-        A.RandomShadow(p=p),
-
         # Noises
         A.OneOf([
             A.ISONoise(p=p),
@@ -49,12 +43,10 @@ def default_augment(p=0.3):
         A.OneOf([
             A.ImageCompression(p=p),
             A.GaussianBlur(p=p),
-            A.Defocus(radius=(1, 3), p=p),
             A.Posterize(p=p),
             A.GlassBlur(sigma=0.1, max_delta=1, iterations=1, p=p),
-            A.MedianBlur(blur_limit=3, p=p),
+            A.MedianBlur(blur_limit=1, p=p),
             A.MotionBlur(p=p),
-            A.ZoomBlur(max_factor=1.1, p=p),
         ]),
 
         # Spatial transform
@@ -67,7 +59,7 @@ def default_augment(p=0.3):
             # A.PiecewiseAffine(nb_rows=3, nb_cols=3, p=p),
 
             # Removed due to making the output out of range
-            # A.ShiftScaleRotate(p=p),
+            A.ShiftScaleRotate(p=p),
             # A.SafeRotate((-5, 5), p=p),
         ])
     ], keypoint_params=keypoint_params)
