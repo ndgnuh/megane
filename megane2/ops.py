@@ -229,6 +229,57 @@ def simplify_contour(contour, min_corners=4, max_corners=6):
             return approx, True
 
 
+PERMUTATIONS = [
+    [0, 1, 2, 3],
+    [1, 2, 3, 0],
+    [2, 3, 0, 1],
+    [3, 0, 1, 2]
+]
+PERMUTATIONS = PERMUTATIONS + [list(reversed(p)) for p in PERMUTATIONS]
+
+
+def match_polygon(p1, p2):
+    dists = [np.linalg.norm(p2[p, :] - p1, axis=1).mean()
+             for p in PERMUTATIONS]
+    idx = np.argmin(dists)
+    return p2[PERMUTATIONS[idx]]
+
+
+def crop_from_polygon(image, polygon):
+    # Bounding rectangle
+    x1, y1 = polygon.min(axis=0)
+    x2, y2 = polygon.max(axis=0)
+    w = x2 - x1
+    h = y2 - y1
+    dst_pts = np.array([(0, h), (0, 0), (w, 0), (w, h)], dtype='float32')
+    dst_pts = match_polygon(polygon, dst_pts)
+
+    # the perspective transformation matrix
+    M = cv2.getPerspectiveTransform(
+        polygon.astype('float32'), dst_pts.astype('float32'))
+
+    # directly warp the rotated rectangle to get the straightened rectangle
+    warped = cv2.warpPerspective(
+        image, M, (int(w), int(h)), cv2.INTER_CUBIC, cv2.BORDER_CONSTANT)
+    return warped
+
+
+def crop_from_mask(image, mask):
+    cnts, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
+    crops = []
+    height, width = image.shape[:2]
+    for cnt in cnts:
+        polygon, success = simplify_contour(cnt, max_corners=4, min_corners=4)
+        polygon = polygon[:, 0, :]  # 4, 1, 2 -> 4, 2
+        if not success:
+            continue
+
+        # Bounding rectangle
+        warped = crop_from_polygon(image, polygon)
+        crops.append(warped)
+    return crops
+
+
 def polygon_score(proba_map, polygon):
     mask = np.zeros_like(proba_map)
     cv2.fillPoly(mask, [polygon], 1)
