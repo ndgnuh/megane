@@ -1,10 +1,9 @@
-import cv2
 import torch
-from megane2.loaders import megane_dataloader
-from megane2.configs import read_config
-from megane2 import transforms, models
 from torchvision.transforms import functional as TF
 from PIL import Image
+
+from .configs import read_config
+from . import transforms, models
 
 
 class Predictor:

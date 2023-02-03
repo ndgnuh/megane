@@ -2,15 +2,15 @@ import cv2
 import torch
 import random
 from os import path
-from megane2.loaders import megane_dataloader
-from megane2 import transforms, losses, models, scores
 from pytorch_lightning.lite import LightningLite
 from torch import optim
 from tqdm import tqdm
-from . import visualize
+
 from . import stats
 from .configs import read_config
 from .augments import Augment
+from .loaders import megane_dataloader
+from . import transforms, losses, models, scores
 
 
 def cycle(dataloader, total_steps):

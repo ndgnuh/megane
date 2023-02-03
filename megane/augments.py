@@ -40,14 +40,14 @@ def default_augment(p=0.3):
         ]),
 
         # Image degration
-        A.OneOf([
-            A.ImageCompression(p=p),
-            A.GaussianBlur(p=p),
-            A.Posterize(p=p),
-            A.GlassBlur(sigma=0.1, max_delta=1, iterations=1, p=p),
-            A.MedianBlur(blur_limit=1, p=p),
-            A.MotionBlur(p=p),
-        ]),
+        # A.OneOf([
+        #     A.ImageCompression(p=p),
+        #     A.GaussianBlur(p=p),
+        #     A.Posterize(p=p),
+        #     A.GlassBlur(sigma=0.1, max_delta=1, iterations=1, p=p),
+        #     A.MedianBlur(blur_limit=1, p=p),
+        #     A.MotionBlur(p=p),
+        # ]),
 
         # Spatial transform
         A.OneOf([

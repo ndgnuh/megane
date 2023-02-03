@@ -57,7 +57,7 @@ def get_option_shell(args):
 
 
 def main():
-    from megane2.trainer import Trainer
+    from megane.trainer import Trainer
     parser = ArgumentParser()
     parser.add_argument("-i",
                         action="store_true",

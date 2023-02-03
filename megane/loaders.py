@@ -7,6 +7,7 @@ from torchvision.datasets import VisionDataset
 from torch.utils.data import Dataset, DataLoader
 from typing import Optional, Callable
 from functools import lru_cache
+from base64 import b64decode
 
 
 def image_from_bytes(bs):
