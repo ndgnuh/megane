@@ -1,0 +1,9 @@
+model: db_shufflenet_v2_x1_5
+model_head_dim: 256
+model_head_activation: ReLU
+
+loss: DBLoss
+
+image_width: 1024
+image_height: 1024
+

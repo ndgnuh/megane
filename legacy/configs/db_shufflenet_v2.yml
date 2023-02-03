@@ -12,9 +12,10 @@ head_options:
 processor: DBProcessor
 processor_options: {}
 
-loss: DBLoss
-loss_options: {}
+loss: LossMixin
+loss_options:
+  mode: db
 
-image_width: 1024
-image_height: 1024
+image_width: 768
+image_height: 512
 
