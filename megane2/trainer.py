@@ -31,6 +31,7 @@ class Trainer(LightningLite):
         val_data: str,
         total_steps: int = 10_000,
         validate_every: int = 100,
+        learning_rate: float = 3e-4,
         batch_size: int = 4,
         num_workers: int = 1,
     ):
@@ -49,7 +50,7 @@ class Trainer(LightningLite):
         self.post_processor = transforms.DBPostprocess.from_config(
             self.model_config
         )
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=1e-3)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
         self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer,
             T_max=total_steps,

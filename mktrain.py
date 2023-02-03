@@ -13,6 +13,7 @@ python train.py -c {model_config} \\
     --batch-size {batch_size} \\
     --num-workers {num_workers} \\
     --validate-every {validate_every}
+    --learning-rate {learning_rate}
 """.format_map(options)
 script_file = path.join("scripts/", script_name)
 if not script_file.endswith(".sh"):

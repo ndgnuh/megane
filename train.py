@@ -12,6 +12,16 @@ def get_option_interactive():
     def ask_file(prompt, default=""):
         q = Q.path(prompt, validate=path.isfile, default=str(default))
         return q.ask()
+
+    def ask_float(prompt, default):
+        def isfloat(x: str):
+            try:
+                float(x)
+                return True
+            except Exception:
+                return False
+        q = Q.text(prompt, validate=isfloat, default=str(default))
+        return q.ask
     options = dict()
     options["model_config"] = ask_file("Model config (.yml):")
     options["train_data"] = ask_file("Train data index:")
@@ -21,6 +31,7 @@ def get_option_interactive():
     options["num_workers"] = ask_int("Number of workers", 1)
     options["total_steps"] = ask_int("Total training steps:", 1000)
     options["validate_every"] = ask_int("Validate every:", 50)
+    options["learning_rate"] = ask_float("Learning rate:", 3e-4)
 
     return options
 
@@ -37,6 +48,7 @@ def get_option_shell(args):
     parser.add_argument("--total-steps", "-N", type=int, default=1000)
     parser.add_argument("--num-workers", type=int, default=1)
     parser.add_argument("--validate-every", type=int, default=10)
+    parser.add_argument("--learning-rate", type=float, default=3e-4)
 
     options = parser.parse_args(args)
     options = {k: getattr(options, k) for k in vars(options)}
