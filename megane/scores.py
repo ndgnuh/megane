@@ -14,7 +14,7 @@ def get_polygons_iou(p1, p2):
         return 0
 
 
-def get_tp_fp_fn(predicts, targets, iou_threshold: float = 0.8):
+def get_tp_fp_fn(predicts, targets, iou_threshold: float = 0.8, allow_merge: bool = True):
     num_predicts = len(predicts)
     num_targets = len(targets)
 
@@ -38,8 +38,21 @@ def get_tp_fp_fn(predicts, targets, iou_threshold: float = 0.8):
     targets_visited = [False] * num_targets
     tp = 0  # True position = correctly guess the box position
     for i, j, iou in ious:
-        if iou < iou_threshold or predicts_visited[i] or targets_visited[j]:
+        if iou < iou_threshold:
             continue
+
+        # A predicted box is a merge of multiple targets
+        if predicts_visited[i]:
+            if allow_merge:
+                num_targets -= 1
+            continue
+
+        # vice versa
+        if targets_visited[j]:
+            if allow_merge:
+                num_predicts -= 1
+            continue
+
         tp = tp + 1
         predicts_visited[i] = targets_visited[j] = True
 
