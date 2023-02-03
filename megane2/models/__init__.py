@@ -1,8 +1,16 @@
 from torch import nn
+from gdown import cached_download
 import torch
 
 from .db import DBHead
 from .fpn import FPNBackbone
+
+
+def load_or_download(wpath: str):
+    if wpath.startswith("http"):
+        wpath = cached_download(wpath)
+    weights = torch.load(wpath, map_location="cpu")
+    return weights
 
 
 class DBNet(nn.Module):
@@ -18,7 +26,8 @@ class DBNet(nn.Module):
         self.head = DBHead(hidden_size, num_classes=num_classes)
 
         if weights is not None:
-            self.load_state_dict(torch.load(weights, map_location="cpu"))
+            weights = load_or_download(weights)
+            self.load_state_dict(weights)
 
     def forward(self, image):
         features = self.fpn(image)
