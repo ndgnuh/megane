@@ -5,12 +5,35 @@ from os import path
 from pytorch_lightning.lite import LightningLite
 from torch import optim
 from tqdm import tqdm
+from queue import Queue
+from threading import Thread
 
 from . import stats
 from .configs import read_config
 from .augments import Augment
 from .loaders import megane_dataloader
 from . import transforms, losses, models, scores
+
+
+class VisualizeThread:
+    def __init__(self):
+        self.queue = Queue()
+        self.thread = Thread(target=self.wait_for_image)
+        self.thread.start()
+
+    def wait_for_image(self):
+        while True:
+            try:
+                image = self.queue.get()
+                cv2.imshow("Image", image)
+                cv2.waitKey(1)
+                cv2.imshow("Image", image)
+                cv2.waitKey(1)
+            except KeyboardInterrupt:
+                break
+
+    def __call__(self, image):
+        self.queue.put(image)
 
 
 def cycle(dataloader, total_steps):
@@ -78,6 +101,9 @@ class Trainer(LightningLite):
             batch_size=batch_size,
             num_workers=num_workers,
         )
+
+        # Visualizer
+        self.visualize = VisualizeThread()
 
     def run(self, action: str, **kwargs):
         if action == "train":
@@ -171,10 +197,7 @@ class Trainer(LightningLite):
 
             if visualize_index == count:
                 proba_map = proba_maps[0][0].cpu().numpy()
-                target_proba_map = torch.sigmoid(
-                    proba_maps[0][0]).cpu().numpy()
-                cv2.imshow("proba map", proba_map)
-                cv2.waitKey(1)
+                self.visualize(proba_map)
 
             count = count + 1
 
