@@ -49,7 +49,7 @@ def image_from_bytes(bs):
 
 def image_to_bytes(image):
     io = BytesIO()
-    image.save(io, "JPEG")
+    image.save(io, "PNG")
     bs = io.getbuffer()
     return bs
 
