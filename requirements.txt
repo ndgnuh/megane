@@ -12,3 +12,4 @@ questionary
 matplotlib
 albumentations --no-binary qudida,albumentations
 gdown
+lmdb
