@@ -8,27 +8,66 @@ from torch.utils.data import Dataset, DataLoader
 from typing import Optional, Callable
 from functools import lru_cache
 from base64 import b64decode
+from tqdm import tqdm
+from io import BytesIO
+
+
+def create_lmdb_dataset(root, dataset):
+    import lmdb
+    env = lmdb.open(root, map_size=int(1e13))
+    with env.begin(write=True) as txn:
+        count = 0
+        for image, annotation in tqdm(dataset, f"Writing to {root}"):
+            image_bin = image_to_bytes(image)
+            annotation_bin = json.dumps(annotation).encode()
+            # labels_bin = numpy_to_bytes(np.array(annotation['labels']))
+            # polygons_bin = numpy_to_bytes(np.array(annotation['polygons']))
+            txn.put(f"image_{count:09d}".encode(), image_bin)
+            txn.put(f"annotation_{count:09d}".encode(), annotation_bin)
+            # txn.put(f"labels_{count:09d}".encode(), polygons_bin)
+            count = count + 1
+
+        txn.put("num_samples".encode(), str(count).encode())
+    env.close()
+
+
+def numpy_to_bytes(x: np.ndarray):
+    io = BytesIO()
+    np.save(io, x)
+    return io.getvalue()
+
+
+def numpy_from_bytes(bs):
+    io = BytesIO(bs)
+    return np.load(io)
 
 
 def image_from_bytes(bs):
-    from io import BytesIO
     io = BytesIO(bs)
     return Image.open(io)
 
 
+def image_to_bytes(image):
+    io = BytesIO()
+    image.save(io, "JPEG")
+    bs = io.getbuffer()
+    return bs
+
+
 def load_sample_lmdb(sample: tuple):
     env, idx = sample
-    with env as txn:
-        image = image_from_bytes(txn.get("image_{idx:04d}".encode()))
-        labels = np.frombytes(txn.get("labels_{idx:04d}".encode()))
-        polygons = np.frombytes(txn.get("labels_{idx:04d}".encode()))
+    with env.begin() as txn:
+        image = image_from_bytes(txn.get(f"image_{idx:09d}".encode()))
+        annotation = txn.get(f"annotation_{idx:09d}".encode())
 
-    return image, labels, polygons
+    annotation = json.loads(annotation.decode("utf-8"))
+
+    return image, annotation
 
 
 def load_sample_megane(sample):
     with open(sample, encoding="utf-8") as f:
-        json.parse(f)
+        annotation = json.load(f)
     root = path.dirname(sample)
     image = Image.open(path.join(root, annotation['image_path']))
     image = image.convert("RGB")
@@ -84,7 +123,7 @@ def load_sample_labelme(sample):
     return image, annotation
 
 
-class IndexedImageFolder(VisionDataset):
+class MeganeDataset(Dataset):
     def __init__(self,
                  index: str,
                  transform: Optional[Callable] = None,
@@ -92,94 +131,58 @@ class IndexedImageFolder(VisionDataset):
                  transforms: Optional[Callable] = None,
                  index_encoding: str = 'utf-8',
                  **kwargs):
+        super().__init__()
         root = path.dirname(index)
-        super().__init__(
-            root=root,
-            transforms=transforms
-        )
 
         self.transform = transform
         self.target_transform = target_transform
         self.root = root
         self.index = index
-        with open(self.index, encoding=index_encoding) as f:
-            lines = [line.strip() for line in f.readlines()]
-            lines = [path.join(root, line) for line in lines if len(line) > 0]
-        self.samples = lines
-
-    def load_sample(self, sample: str):
-        raise NotImplementedError("Error")
+        self.index_encoding = index_encoding
+        self.samples = self.read_index(index)
+        self.load_sample = self.detect_sample_loader()
+        print(self.load_sample)
 
     def __len__(self):
         return len(self.samples)
 
-    def __getitem__(self, index: int):
-        image, target = self.load_sample(self.samples[index])
-        if self.transforms is not None:
-            image = self.transforms(image)
-            target = self.transforms(target)
-        if self.transform is not None:
-            image = self.transform(image)
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-        return image, target
+    def read_index(self, index):
+        if index.endswith(".txt"):
+            with open(self.index, encoding=self.index_encoding) as f:
+                lines = [line.strip() for line in f.readlines()]
+                lines = [path.join(self.root, line)
+                         for line in lines if len(line) > 0]
+            return lines
+        elif index.endswith(".mdb"):
+            import lmdb
+            env = lmdb.open(path.dirname(self.index),
+                            lock=False,
+                            map_size=int(1e13))
+            with env.begin() as txn:
+                num_samples = txn.get("num_samples".encode())
+                num_samples = int(num_samples.decode())
+            samples = [(env, count) for count in range(num_samples)]
+            return samples
+        else:
+            raise ValueError(f"Unsupported index file {index}")
 
+    def detect_sample_loader(self):
+        if self.index.endswith(".mdb"):
+            return load_sample_lmdb
+        else:
+            for loader in [load_sample_megane, load_sample_labelme]:
+                try:
+                    loader(self.samples[0])
+                    return loader
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                    continue
 
-class MeganeDatasetOld(Dataset):
-    def __init__(self, root: str, transform: Optional[Callable] = None):
-        super().__init__()
-        self.root = root
-        self.transform = transform
-        self.samples = []
-        for file in os.listdir(root):
-            if not file.endswith(".json"):
-                continue
-            with open(path.join(root, file)) as f:
-                self.samples.append(json.load(f))
-
-    def __len__(self):
-        return len(self.samples)
-
-    def load_sample(self, idx):
-        annotation = self.samples[idx]
-        image = Image.open(
-            path.join(self.root, annotation['image_path'])
-        ).convert("RGB")
-        try:
-            annotation.pop("width")
-            annotation.pop("height")
-        except Exception:
-            pass
-        return image, annotation
+        raise ValueError("Invalid annotation, no compatible sample loader")
 
     def __getitem__(self, idx):
-        image, annotation = self.load_sample(idx)
-        if self.transform is not None:
-            image, annotation = self.transform(image, annotation)
-        return image, annotation
-
-
-class MeganeDataset(IndexedImageFolder):
-    @lru_cache
-    def get_annotation(self, idx):
-        with open(self.samples[idx], encoding="utf-8") as io:
-            data = json.load(io)
-        return data
-
-    def load_sample(self, idx):
-        annotation = self.get_annotation(idx)
-        root = path.dirname(self.samples[idx])
-        image = Image.open(path.join(root, annotation['image_path']))
-        image = image.convert("RGB")
-        try:
-            annotation.pop("width")
-            annotation.pop("height")
-        except Exception:
-            pass
-        return image, annotation
-
-    def __getitem__(self, idx):
-        image, annotation = self.load_sample(idx)
+        image, annotation = self.load_sample(self.samples[idx])
         if self.transform is not None:
             image, annotation = self.transform(image, annotation)
         return image, annotation
