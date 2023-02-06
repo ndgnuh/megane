@@ -15,6 +15,7 @@ class Predictor:
         if isinstance(model_config, str):
             model_config = read_config(model_config)
         self.model = models.DBNet.from_config(model_config)
+        self.model = self.model.eval()
         self.post_processor = transforms.DBPostprocess.from_config(
             model_config
         )
