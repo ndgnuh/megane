@@ -1,6 +1,7 @@
 import cv2
 import torch
 import random
+import os
 from os import path
 from pytorch_lightning.lite import LightningLite
 from torch import optim
@@ -17,9 +18,13 @@ from . import transforms, losses, models, scores
 
 class VisualizeThread:
     def __init__(self):
-        self.queue = Queue()
-        self.thread = Thread(target=self.wait_for_image)
-        self.thread.start()
+        if ("DISPLAY" in os.environ and os.environ["DISPLAY"].lower() != 'None'):
+            self.queue = Queue()
+            self.thread = Thread(target=self.wait_for_image)
+            self.thread.start()
+            self.dummy = False
+        else:
+            self.dummy = True
 
     def wait_for_image(self):
         while True:
@@ -33,7 +38,10 @@ class VisualizeThread:
                 break
 
     def __call__(self, image):
-        self.queue.put(image)
+        if self.dummy:
+            pass
+        else:
+            self.queue.put(image)
 
 
 def cycle(dataloader, total_steps):
