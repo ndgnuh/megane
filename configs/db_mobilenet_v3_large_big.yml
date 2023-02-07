@@ -2,7 +2,7 @@ backbone: mobilenet_v3_large
 head: dbnet
 hidden_size: 128
 num_classes: 1
-weights: https://github.com/ndgnuh/megane/releases/download/weights-v2/db_mobilenet_v3_large_big.pt
+# weights: https://github.com/ndgnuh/megane/releases/download/weights-v2/db_mobilenet_v3_large_big.pt
 
 # Pre/Post processing
 image_width: 1024
