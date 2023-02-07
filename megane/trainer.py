@@ -18,7 +18,7 @@ from . import transforms, losses, models, scores
 
 class VisualizeThread:
     def __init__(self):
-        if ("DISPLAY" in os.environ and os.environ["DISPLAY"].lower() != 'None'):
+        if ("DISPLAY" in os.environ and os.environ["DISPLAY"].lower() != 'none'):
             self.queue = Queue()
             self.thread = Thread(target=self.wait_for_image)
             self.thread.start()
