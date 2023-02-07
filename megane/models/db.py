@@ -34,11 +34,11 @@ class DBHead(nn.Module):
 
         return nn.Sequential(
             nn.Conv2d(input_size, head_size_d4, 3, padding=1, bias=False),
-            nn.BatchNorm2d(head_size_d4),
+            nn.InstanceNorm2d(head_size_d4),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(head_size_d4, head_size_d4,
                                2, stride=2, bias=False),
-            nn.BatchNorm2d(head_size_d4),
+            nn.InstanceNorm2d(head_size_d4),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(head_size_d4, self.num_classes, 2, stride=2),
         )

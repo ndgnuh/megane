@@ -22,7 +22,7 @@ class FPN(nn.Module):
         self.in_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(in_channel, out_channel, 3, padding=1),
-                nn.BatchNorm2d(out_channel),
+                nn.InstanceNorm2d(out_channel),
                 nn.ReLU()
             )
             for in_channel in in_channels
@@ -31,7 +31,7 @@ class FPN(nn.Module):
         self.out_branch = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(out_channel, mid_channel, 3, padding=1),
-                nn.BatchNorm2d(mid_channel),
+                nn.InstanceNorm2d(mid_channel),
                 nn.ReLU(),
                 nn.Upsample(scale_factor=2**i,
                             mode="bilinear",
