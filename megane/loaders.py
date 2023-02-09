@@ -10,6 +10,7 @@ from functools import lru_cache
 from base64 import b64decode
 from tqdm import tqdm
 from io import BytesIO
+from scipy import io as sio
 
 
 def create_lmdb_dataset(root, dataset):
@@ -52,6 +53,19 @@ def image_to_bytes(image):
     image.save(io, "PNG")
     bs = io.getbuffer()
     return bs
+
+
+def load_sample_synthtext(sample: tuple):
+    images, polygons, idx = sample
+    image = Image.open(images[idx])
+    polygons = polygons[idx].transpose([2, 1, 0]).copy()
+    polygons[:, :, 0] = polygons[:, :, 0] / image.width
+    polygons[:, :, 1] = polygons[:, :, 1] / image.height
+    annotation = dict(
+        polygons=polygons.tolist(),
+        labels=[0] * polygons.shape[0]
+    )
+    return image, annotation
 
 
 def load_sample_lmdb(sample: tuple):
@@ -163,12 +177,24 @@ class MeganeDataset(Dataset):
                 num_samples = int(num_samples.decode())
             samples = [(env, count) for count in range(num_samples)]
             return samples
+        elif index.endswith(".mat"):
+            # SynthText
+            import scipy.io as sio
+            root = path.dirname(index)
+            gt = sio.loadmat(index)
+            images = [path.join(root, image[0])
+                      for image in gt['imnames'].flatten()]
+            bboxes = gt['charBB'][:].flatten()
+            total = gt['imnames'][:].shape[-1]
+            return [(images, bboxes, i) for i in range(total)]
         else:
             raise ValueError(f"Unsupported index file {index}")
 
     def detect_sample_loader(self):
         if self.index.endswith(".mdb"):
             return load_sample_lmdb
+        elif self.index.endswith(".mat"):
+            return load_sample_synthtext
         else:
             for loader in [load_sample_megane, load_sample_labelme]:
                 try:
@@ -194,6 +220,8 @@ def megane_dataloader(
     batch_size: int = 1,
     shuffle: bool = False,
     num_workers: Optional[int] = 0
+
+
 ):
     dataset = MeganeDataset(root, transform=transform)
     return DataLoader(
