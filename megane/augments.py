@@ -1,9 +1,49 @@
 import albumentations as A
+import random
 import numpy as np
 from typing import Optional
 from dataclasses import dataclass
 from typing import Callable
-from PIL import Image
+from PIL import Image, ImageDraw
+from functools import lru_cache, cached_property
+from os import path, listdir, environ
+import cv2
+
+
+class CopyPaste:
+    def __init__(self, bg_dir=None, p=0.5):
+        if bg_dir is None:
+            bg_dir = environ["COPY_PASTE_BG_DIR"]
+        self.background_dir = bg_dir
+        self.p = p
+
+    @cached_property
+    def background_files(self):
+        return [
+            np.array(Image.open(
+                path.join(self.background_dir, file)
+            ).convert("RGB"))
+            for file in listdir(self.background_dir)
+        ]
+
+    def __call__(self, image, keypoints: np.ndarray):
+        if random.uniform(0, 1) >= self.p:
+            return dict(image=image, keypoints=keypoints)
+
+        # Background mask
+        h, w = image.shape[:2]
+        mask = Image.new("L", (w, h), 0)
+        mask_draw = ImageDraw.Draw(mask)
+        for polygon in keypoints:
+            mask_draw.polygon(polygon, fill=255)
+        mask = np.array(mask) > 0
+        mask = mask[:, :, None]
+
+        # Random background
+        bg = random.choice(self.background_files)
+        bg = cv2.resize(bg, (w, h))
+        image = image * mask + (~mask) * bg
+        return dict(image=image, keypoints=keypoints)
 
 
 def no_augment():
@@ -14,6 +54,8 @@ def default_augment(p=0.3):
     keypoint_params = A.KeypointParams(format='xy', remove_invisible=False)
 
     return A.Compose([
+        CopyPaste(p=0.7),
+
         # Changing image coloring
         A.OneOf([
             A.CLAHE(p=p),
@@ -40,14 +82,14 @@ def default_augment(p=0.3):
         ]),
 
         # Image degration
-        # A.OneOf([
-        #     A.ImageCompression(p=p),
-        #     A.GaussianBlur(p=p),
-        #     A.Posterize(p=p),
-        #     A.GlassBlur(sigma=0.1, max_delta=1, iterations=1, p=p),
-        #     A.MedianBlur(blur_limit=1, p=p),
-        #     A.MotionBlur(p=p),
-        # ]),
+        A.OneOf([
+            A.ImageCompression(p=p),
+            A.GaussianBlur(p=p),
+            A.Posterize(p=p),
+            A.GlassBlur(sigma=0.1, max_delta=1, iterations=1, p=p),
+            A.MedianBlur(blur_limit=1, p=p),
+            A.MotionBlur(p=p),
+        ]),
 
         # Spatial transform
         A.OneOf([
@@ -84,7 +126,7 @@ class Augment:
         polygons[:, 1] *= height
         result = self.transform(
             image=np.array(image),
-            keypoints=polygons,
+            keypoints=polygons
         )
 
         # Outputs
