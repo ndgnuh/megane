@@ -155,6 +155,7 @@ class MeganeDataset(Dataset):
         self.index_encoding = index_encoding
         self.samples = self.read_index(index)
         self.load_sample = self.detect_sample_loader()
+        self.max_image_size = os.environ.get("MAX_IMAGE_SIZE", 1280)
         print(self.load_sample)
 
     def __len__(self):
@@ -209,6 +210,7 @@ class MeganeDataset(Dataset):
 
     def __getitem__(self, idx):
         image, annotation = self.load_sample(self.samples[idx])
+        image.thumbnail((self.max_image_size, self.max_image_size))
         if self.transform is not None:
             image, annotation = self.transform(image, annotation)
         return image, annotation
