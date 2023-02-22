@@ -1,3 +1,4 @@
+
 import cv2
 import torch
 import random
@@ -15,7 +16,9 @@ from .augments import Augment
 from .loaders import megane_dataloader
 from . import transforms, losses, models, scores
 
+import time
 
+os.environ["DISPLAY"]=":0"
 class VisualizeThread:
     def __init__(self):
         if ("DISPLAY" in os.environ and os.environ["DISPLAY"].lower() != 'none'):
@@ -65,7 +68,8 @@ class Trainer(LightningLite):
         learning_rate: float = 3e-4,
         batch_size: int = 4,
         num_workers: int = 1,
-    ):
+    ):  
+        print("model_config: ",model_config)
         super().__init__(accelerator="auto")
         self.name = path.splitext(path.basename(model_config))[0]
         self.best_weight_path = path.join(
@@ -79,12 +83,13 @@ class Trainer(LightningLite):
         self.validate_every = validate_every
 
         # Model
-        self.criterion = losses.DBLoss()
+        self.criterion = losses.GSpadeLoss()
         self.model = models.DBNet.from_config(self.model_config)
         self.post_processor = transforms.DBPostprocess.from_config(
             self.model_config
         )
         self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
+
         self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer,
             T_max=total_steps,
@@ -97,7 +102,7 @@ class Trainer(LightningLite):
         self.train_loader = megane_dataloader(
             train_data,
             transform=transforms.Compose([
-                Augment.from_string("yes"),
+                Augment.from_string("no"),
                 transform
             ]),
             batch_size=batch_size,
@@ -144,11 +149,15 @@ class Trainer(LightningLite):
 
             optimizer.zero_grad()
             outputs = model(images)
+            # print("output: ",len(outputs))
+            # print("annotations: ",len(annotations))
+            # print("model.device: ",model.device)
             loss = criterion(*outputs, *annotations)
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
 
+            print("avg_train_loss: ",avg_train_loss)
             avg_train_loss.append(loss.item())
             if step % print_every == 0:
                 lr = optimizer.param_groups[0]['lr']
@@ -183,30 +192,30 @@ class Trainer(LightningLite):
 
         avg_f1_score = stats.AverageStatistic()
         avg_val_loss = stats.AverageStatistic()
-
+        print("visualize_index: ",visualize_index)
         count = 0
+        
         for images, annotations in tqdm(val_loader, "Validating", dynamic_ncols=True):
             outputs = model(images)
             loss = criterion(*outputs, *annotations)
             avg_val_loss.append(loss.item())
-
             # Check accuracy
             # The first map is the probability map
             proba_maps = torch.sigmoid(outputs[0])
+            thresh_maps = torch.sigmoid(outputs[1])
             target_proba_maps = annotations[0]
             for proba_map, target_proba_map in zip(proba_maps, target_proba_maps):
                 polygons, _, _, _ = self.post_processor(
-                    proba_map.cpu().numpy()
+                    proba_map.cpu().numpy().astype('float32')
                 )
                 target_polygons, _, _, _ = self.post_processor(
                     target_proba_map.cpu().numpy().astype('float32')
                 )
                 avg_f1_score.append(scores.f1_score(polygons, target_polygons))
-
-            if visualize_index == count:
-                proba_map = proba_maps[0][0].cpu().numpy()
-                self.visualize(proba_map)
-
+                if visualize_index == count:
+                    proba_map = proba_maps[0][0].cpu().numpy()
+                    argmax_map= torch.argmax(torch.cat((thresh_maps[0], proba_maps[0]), dim=0),dim=0)
+                    self.visualize(argmax_map.cpu().numpy().astype('float32'))
             count = count + 1
 
         # THIS IS A DRAFT

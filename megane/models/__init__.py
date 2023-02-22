@@ -29,10 +29,10 @@ class DBNet(nn.Module):
             weights = load_or_download(weights)
             self.load_state_dict(weights)
 
-    def forward(self, image):
+    def forward(self, image,**k):
         features = self.fpn(image)
         features = torch.cat(features, dim=-3)
-        proba_maps, threshold_maps = self.head(features)
+        proba_maps, threshold_maps = self.head(features,**k)
         return proba_maps, threshold_maps
 
     @classmethod

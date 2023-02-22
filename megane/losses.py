@@ -6,6 +6,7 @@ from torch.nn import functional as F
 from dataclasses import dataclass
 import torch
 
+from torch import nn
 
 @dataclass
 class DBLoss:
@@ -76,3 +77,36 @@ class DBLoss:
             bin_map_loss
         )
         return total_loss
+
+
+
+
+class GSpadeLoss(nn.Module):
+
+    def __init__(self, no_prob=0.1, yes_prob=1):
+        super().__init__()
+        self.loss = nn.CrossEntropyLoss(
+            weight=torch.tensor([no_prob, yes_prob])).to("cuda:0")
+        self.l2= nn.L1Loss()
+    def forward(self, prob, thres, 
+        target_proba_maps: Tensor,  # Bool
+            proba_masks: Tensor,  # Bool
+            target_threshold_maps: Tensor,  # Bool
+            threshold_masks: Tensor,  # Bool
+            spade_loss_mask: Tensor,  # Bool,
+        ):
+
+        # print("spade_loss_mask: ", spade_loss_mask.dtype)
+        # print("prob: ",prob.dtype)
+        labels = spade_loss_mask.type(torch.long)
+        scores=torch.cat((thres, prob), dim=1)
+        score_cross=self.loss(scores, labels)
+        score_l2=self.l2(prob.squeeze(1), spade_loss_mask.float())
+        # score_l2=self.l2(thres.squeeze(1), 1 - spade_loss_mask.float())
+        # if scores.dim() == 3:
+        #     scores = scores.unsqueeze(0)
+        # if labels.dim() == 2:
+        #     labels = labels.unsqueeze(0)
+        
+
+        return score_cross #+score_l2

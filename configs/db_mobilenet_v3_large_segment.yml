@@ -1,0 +1,16 @@
+backbone: mobilenet_v3_large
+head: dbnet
+hidden_size: 96
+num_classes: 1
+weights: storage/weights/db_mobilenet_v3_large-best.pt
+
+
+# Pre/Post processing
+image_width: 640
+image_height: 640
+
+shrink_ratio: 0.4
+expand_ratio: 1.5
+min_box_size: 100
+min_score:  0.6
+min_threshold: 0.7
