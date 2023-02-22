@@ -83,7 +83,8 @@ def load_sample_megane(sample):
     with open(sample, encoding="utf-8") as f:
         annotation = json.load(f)
     root = path.dirname(sample)
-    image = Image.open(path.join(root, annotation['image_path']))
+
+    image = Image.open(path.join(root, annotation['imagePath']))
     image = image.convert("RGB")
     try:
         annotation.pop("width")

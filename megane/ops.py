@@ -160,7 +160,13 @@ def mask_to_polygons(
     angles = []
     scores = []
     cnts, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    
+    # max_cnt=1000
     for cnt in cnts:
+        # if max_cnt==0:
+        #     break
+        # else:
+        #     max_cnt-=1
         # Make sure the polygon has 4 corners
         if cnt.shape[0] < 4:
             continue
@@ -284,3 +290,41 @@ def polygon_score(proba_map, polygon):
     mask = np.zeros_like(proba_map)
     cv2.fillPoly(mask, [polygon], 1)
     return (mask * proba_map).sum() / np.count_nonzero(mask)
+
+
+# import matplotlib.pyplot as plt
+# def plot_img(img,size=(8,8)):
+#     plt.figure(figsize=size)
+#     plt.imshow(img)
+#     plt.axis('off')
+#     plt.show()
+def polygon_to_mask_segment(image, annotation,new_w,new_h):
+    polygon=np.array(annotation['shapes'][0]['points'])
+    image=np.array(image)
+    ano_h,ano_w=annotation['imageHeight'],annotation['imageWidth']
+    mask = np.zeros((new_w,new_h), dtype=np.uint8)
+    new_points=[]
+    for i in range(len(polygon)):
+        x=int(polygon[i][0]/ano_w*new_w)
+        y=int(polygon[i][1]/ano_h*new_h)
+        # print("before: ",polygon[i])
+        # print("after: ",x,y)
+        new_points.append([x,y])
+    cv2.fillPoly(mask,  pts=[np.array(new_points)], color=(255,255,255))
+    
+    # Draw the element wit a color depending on the Class
+    # cv2.drawContours(mask, [arr.astype(np.int32)], -1, (255, 255, 255), -1, cv2.LINE_AA)
+
+    return mask
+
+def mask_to_polygons_segment(mix_maps):
+    h,w=mix_maps.shape
+    cnts, _ = cv2.findContours(mix_maps.astype('uint8'), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnt=cnts[np.argmax([cv2.contourArea(x) for x in cnts])]
+    xy, wh, angle = cv2.minAreaRect(cnt)
+    polygons,_ = simplify_contour(cnt,4,4)
+    polygons = [
+            [(x / w, y / h) for (x, y) in points]
+            for points in [polygons[:,0,:]]
+        ]
+    return polygons
