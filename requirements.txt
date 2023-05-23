@@ -2,4 +2,7 @@ torch
 torchvision
 Pillow
 numpy
-pytorch_lightning
+lightning
+pydantic
+pytest
+python-lenses
