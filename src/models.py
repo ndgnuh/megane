@@ -2,8 +2,43 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import torch
+import numpy as np
+from shapely.geometry import Polygon
 from torch import nn
 from torchvision.models import mobilenet_v3_small
+
+
+def get_matching_index(pr_boxes: np.ndarray, gt_boxes: np.ndarray):
+    pr_polygons = [Polygon(box) for box in pr_boxes]
+    gt_polygons = [Polygon(box) for box in gt_boxes]
+    n, m = len(pr_polygons), len(gt_polygons)
+
+    # Calculate scoring matrix
+    iou_matrix = np.zeros([n, m])
+    for i in range(n):
+        pr = pr_polygons[i]
+        if not pr.is_valid:
+            continue
+
+        for j in range(m):
+            gt = gt_polygons[j]
+            inter = pr.intersection(gt).area
+            uni = pr.union(gt).area
+            iou_matrix[i, j] = inter / uni
+
+    # Get the maximal matching based on score matrix
+    mask = np.zeros(n, bool)
+    count = 0
+    while count < m:
+        idx = np.argmax(iou_matrix)
+        i, j = np.unravel_index(idx, (n, m))
+
+        mask[i] = True
+        iou_matrix[i, :] = -np.inf
+        iou_matrix[:, j] = -np.inf
+
+        count += 1
+    return mask
 
 
 @dataclass
