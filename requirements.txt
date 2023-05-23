@@ -5,4 +5,11 @@ numpy
 lightning
 pydantic
 pytest
-python-lenses
+lenses
+tensorboardX
+matplotlib
+
+# Temporary for the data and back bone only
+python-doctr[torch]
+python-doctr
+rapidfuzz==2.15.1
