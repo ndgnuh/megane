@@ -12,10 +12,10 @@ Box = Tuple[Point, Point, Point, Point]
 
 class Sample(BaseModel):
     image: Any
-    boxes: List[Box] = None
-    classes: List[int] = None
-    box_scores: Optional[List[float]] = None
-    class_scores: Optional[List[float]] = None
+    boxes: List[Box] = Field(default_factor=[])
+    classes: List[int] = Field(default_factor=[])
+    box_scores: List[float] = Field(default_factor=[])
+    class_scores: List[float] = Field(default_factor=[])
 
 
 class MeganeDataset(Dataset):
