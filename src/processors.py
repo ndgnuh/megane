@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+from PIL import Image
 
 from .data import Sample
 
@@ -13,6 +14,8 @@ class Encoded:
     classes: np.ndarray
     class_scores: np.ndarray
     box_scores: np.ndarray
+    image_width: np.ndarray
+    image_height: np.ndarray
 
     def to_tensor(self):
         import torch
@@ -28,12 +31,32 @@ class Encoded:
         return Encoded(**{k: v.cpu().detach().numpy() for k, v in vars(self).items()})
 
 
-def encode(sample: Sample) -> Encoded:
+@dataclass
+class Processor:
+    image_width: int
+    image_height: int
+
+    def encode(self, sample: Sample) -> Encoded:
+        return encode(
+            sample=sample, image_width=self.image_width, image_height=self.image_height
+        )
+
+    def decode(self, encoded: Encoded) -> Sample:
+        return decode(encoded)
+
+
+def encode(sample: Sample, image_width, image_height) -> Encoded:
+    orig_image_width = sample.image.width
+    orig_image_height = sample.image.height
+
     # encode image
-    image = np.array(sample)
+    image = sample.image.resize([image_width, image_height])
+    image = np.array(image)
     if image.dtype == "uint8":
         image = (image / 255).astype("float32")
         image = np.clip(image, 0, 1)
+
+    print(image.shape)
     h, w, c = 0, 1, 2
     image = image.transpose((c, h, w))
 
@@ -44,18 +67,22 @@ def encode(sample: Sample) -> Encoded:
         classes=np.array(sample.classes),
         class_scores=np.array(sample.class_scores),
         box_scores=np.array(sample.box_scores),
+        image_width=np.array(orig_image_width),
+        image_height=np.array(orig_image_height),
     )
 
 
 def decode(enc: Encoded) -> Sample:
     # decode image
     c, h, w = 0, 1, 2
-    image = image.transpose([h, w, c])
-    image = Image.fromarray(image)
+    image = enc.image.transpose([h, w, c])
+    image = (image * 255).astype('uint8')
+    image = Image.fromarray(image).resize([enc.image_width, enc.image_height])
+
     return Sample(
         image=image,
-        boxes=sample.boxes.tolist(),
-        classes=sample.classes.tolist(),
-        class_scores=sample.class_scores.tolist(),
-        box_scores=sample.box_scores.tolist(),
+        boxes=enc.boxes.tolist(),
+        classes=enc.classes.tolist(),
+        class_scores=enc.class_scores.tolist(),
+        box_scores=enc.box_scores.tolist(),
     )

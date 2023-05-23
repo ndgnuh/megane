@@ -1,5 +1,5 @@
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from PIL import Image, ImageDraw
 from typing import List, Tuple, Optional, Any
 from doctr.datasets import SROIE
@@ -12,10 +12,10 @@ Box = Tuple[Point, Point, Point, Point]
 
 class Sample(BaseModel):
     image: Any
-    boxes: List[Box] = Field(default_factor=[])
-    classes: List[int] = Field(default_factor=[])
-    box_scores: List[float] = Field(default_factor=[])
-    class_scores: List[float] = Field(default_factor=[])
+    boxes: List[Box] = Field(default_factory=list)
+    classes: List[int] = Field(default_factory=list)
+    box_scores: List[float] = Field(default_factory=list)
+    class_scores: List[float] = Field(default_factory=list)
 
 
 class MeganeDataset(Dataset):
