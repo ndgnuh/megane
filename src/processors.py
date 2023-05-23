@@ -23,7 +23,7 @@ class Encoded:
         return Encoded(**{k: torch.tensor(v) for k, v in vars(self).items()})
 
     def to_batch(self):
-        return Encoded(**{k: v.unqueeze(0) for k, v in vars(self).items()})
+        return Encoded(**{k: v.unsqueeze(0) for k, v in vars(self).items()})
 
     def to_numpy(self):
         import torch
