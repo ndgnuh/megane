@@ -1,4 +1,5 @@
 import numpy as np
+from PIL import Image
 
 
 def xyxy_to_points(xyxy):
@@ -22,3 +23,22 @@ def points_to_xyxy(points):
     xmax, ymax = points.max(axis=1).transpose([1, 0])
     xyxy = np.stack([xmin, ymin, xmax, ymax], axis=1)
     return xyxy
+
+
+def pil_to_np(image: Image) -> np.ndarray:
+    image_np = np.array(image)
+    if image_np.dtype == "uint8":
+        image_np = (image_np / 255).astype("float32")
+        image_np = np.clip(image_np, 0, 1)
+
+    h, w, c = 0, 1, 2
+    image_np = image_np.transpose((c, h, w))
+    return image_np
+
+
+def np_to_pil(image_np: np.ndarray) -> Image:
+    c, h, w = 0, 1, 2
+    image = image_np.transpose([h, w, c])
+    image = (image * 255).astype("uint8")
+    image = Image.fromarray(image)
+    return image
