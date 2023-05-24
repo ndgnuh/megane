@@ -17,7 +17,10 @@ class MeganeDetector(nn.Module):
         super().__init__()
         self.feature = mobilenet_v3_small(num_classes=1).features
         if config.type == ModelType.DETR_XYXY:
-            self.head = DetrHead(**config.head, num_classes=config.num_classes)
+            self.head = DetrHead(
+                head_dims=self.num_feature_channels,
+                num_classes=config.num_classes
+            )
 
     @cached_property
     def num_feature_channels(self):
@@ -28,6 +31,14 @@ class MeganeDetector(nn.Module):
 
     def forward(self, batch):
         images = batch["image"]
+
+        # b c h w
         features = self.feature(images)
+
+        # this adaptation is just temporary
+        # there will be a standard shape for features
+        # or there will be mulitple neck adaptors
+        b, c, s = range(3)
+        features = features.flatten(-2).permute([b, s, c])
         outputs = self.head(features, batch)
         return outputs

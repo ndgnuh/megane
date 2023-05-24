@@ -89,8 +89,7 @@ def encode(sample: Sample, image_width, image_height) -> Encoded:
         image=image,
         boxes=np.array(sample.boxes),
         classes=np.array(sample.classes),
-        class_scores=np.array(sample.class_scores),
-        box_scores=np.array(sample.box_scores),
+        scores=np.array(sample.scores),
         image_width=np.array(orig_image_width),
         image_height=np.array(orig_image_height),
     )

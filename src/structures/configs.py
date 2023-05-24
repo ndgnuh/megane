@@ -13,6 +13,7 @@ class ModelType(Enum):
     DETR_XYXY = "detr-xyxy"
     PRIOR_XYWH = "prior-xywh"
     DBNET = "dbnet"
+    SEGMENT = "segment"
 
 
 class TrainConfig(BaseModel):
@@ -49,6 +50,8 @@ class ModelConfig(BaseModel):
     num_box_dims: int
     image_width: int
     image_height: int
+
+    head: Dict = Field(default_factory=dict)
 
     pretrained_weights: Optional[str] = None
     inference_weights: Optional[str] = None

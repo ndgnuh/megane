@@ -48,7 +48,7 @@ def normalize(points: np.ndarray, width: int, height: int):
     points = points * 1.0
     points[..., 0] /= width
     points[..., 1] /= height
-    return points
+    return points.astype('float32')
 
 
 def denormalize(points: np.ndarray, width: int, height: int):

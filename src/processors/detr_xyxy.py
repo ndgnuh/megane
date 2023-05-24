@@ -38,9 +38,7 @@ class Encoded:
         return Encoded(**{k: v.unsqueeze(0) for k, v in vars(self).items()})
 
     def to_numpy(self):
-        import torch
-
-        return Encoded(**{k: v.cpu().detach().numpy() for k, v in vars(self).items()})
+        return Encoded(**{k: v.cpu().detach().numpy() for k, v in vars(self).items() if v is not None})
 
 
 @dataclass
