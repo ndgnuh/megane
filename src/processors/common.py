@@ -42,3 +42,18 @@ def np_to_pil(image_np: np.ndarray) -> Image:
     image = (image * 255).astype("uint8")
     image = Image.fromarray(image)
     return image
+
+
+def normalize(points: np.ndarray, width: int, height: int):
+    points = points * 1.0
+    points[..., 0] /= width
+    points[..., 1] /= height
+    return points
+
+
+def denormalize(points: np.ndarray, width: int, height: int):
+    points = points.copy()
+    points[..., 0] *= width
+    points[..., 1] *= height
+    points = points.round().astype(int)
+    return points
