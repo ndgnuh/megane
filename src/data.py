@@ -19,18 +19,24 @@ class Sample(BaseModel):
 
 
 class MeganeDataset(Dataset):
-    def __init__(self, train=True):
+    def __init__(self, train=True, transform=None):
         super().__init__()
         self.sroie = SROIE(train=train, download=True, use_polygons=True)
+        self.transform = transform
 
     def __getitem__(self, idx):
         image, targets = self.sroie[idx]
         boxes = targets["boxes"]
-        return Sample(
+        sample =  Sample(
             image=TF.to_pil_image(image),
             boxes=boxes.tolist(),
             classes=[1] * len(boxes),
         )
+
+        if self.transform is not None:
+            return self.transform(sample)
+        else:
+            return sample
 
     def __len__(self):
         return len(self.sroie)

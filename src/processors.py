@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, get_type_hints, List, Dict
 
 import numpy as np
 from PIL import Image
@@ -32,7 +32,7 @@ class Encoded:
 
 
 @dataclass
-class Processor:
+class DetrProcessor:
     image_width: int
     image_height: int
 
@@ -43,6 +43,18 @@ class Processor:
 
     def decode(self, encoded: Encoded) -> Sample:
         return decode(encoded)
+
+    def collate(self, encoded: List[Encoded]) -> Dict:
+        import torch
+        encoded = [enc.to_tensor() for enc in encoded]
+        images = torch.stack([enc.image for enc in encoded])
+        keys = [key for key in get_type_hints(Encoded).keys() if key != "image"]
+        batch = dict(
+            **{k: [getattr(enc, k) for enc in encoded] for k in keys},
+            images=images,
+        )
+        batch = {k: v for k, v in batch.items() if len(v)}
+        return batch
 
 
 def encode(sample: Sample, image_width, image_height) -> Encoded:
@@ -56,7 +68,6 @@ def encode(sample: Sample, image_width, image_height) -> Encoded:
         image = (image / 255).astype("float32")
         image = np.clip(image, 0, 1)
 
-    print(image.shape)
     h, w, c = 0, 1, 2
     image = image.transpose((c, h, w))
 
@@ -76,7 +87,7 @@ def decode(enc: Encoded) -> Sample:
     # decode image
     c, h, w = 0, 1, 2
     image = enc.image.transpose([h, w, c])
-    image = (image * 255).astype('uint8')
+    image = (image * 255).astype("uint8")
     image = Image.fromarray(image).resize([enc.image_width, enc.image_height])
 
     return Sample(
