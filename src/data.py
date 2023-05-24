@@ -22,7 +22,7 @@ class Sample(BaseModel):
 
     @property
     def image_height(self):
-        return self.image.width
+        return self.image.height
 
 
 class MeganeDataset(Dataset):
