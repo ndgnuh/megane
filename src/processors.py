@@ -7,6 +7,18 @@ from PIL import Image
 from .data import Sample
 
 
+class BatchEncode(dict):
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.__dict__ = self
+
+    def __getitem__(self, idx):
+        if isinstance(idx, int):
+            return Encoded(**{k: v[idx] for k, v in self.items()})
+        else:
+            return dict.__getitem__(self, idx)
+
+
 @dataclass
 class Encoded:
     image: np.ndarray
@@ -44,17 +56,18 @@ class DetrProcessor:
     def decode(self, encoded: Encoded) -> Sample:
         return decode(encoded)
 
-    def collate(self, encoded: List[Encoded]) -> Dict:
+    def collate(self, encoded: List[Encoded]) -> BatchEncode:
         import torch
+
         encoded = [enc.to_tensor() for enc in encoded]
-        images = torch.stack([enc.image for enc in encoded])
+        image = torch.stack([enc.image for enc in encoded])
         keys = [key for key in get_type_hints(Encoded).keys() if key != "image"]
         batch = dict(
             **{k: [getattr(enc, k) for enc in encoded] for k in keys},
-            images=images,
+            image=image,
         )
         batch = {k: v for k, v in batch.items() if len(v)}
-        return batch
+        return BatchEncode(batch)
 
 
 def encode(sample: Sample, image_width, image_height) -> Encoded:

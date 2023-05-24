@@ -109,7 +109,7 @@ class MeganeDetector(nn.Module):
         return feature_channels
 
     def forward(self, batch):
-        images = batch["images"]
+        images = batch["image"]
         # extract features
         feature = self.feature(images)
         # predictions
@@ -118,6 +118,7 @@ class MeganeDetector(nn.Module):
 
         # b c h w -> b c (h w) -> b (h w) c
         class_logits = class_logits.flatten(-2).transpose(-1, -2)
+        # b c h w -> b c (h w) -> b (h w) c -> b (h w) 4 2
         boxes = boxes.flatten(-2).transpose(-1, -2).reshape(images.shape[0], -1, 4, 2)
 
         # Calculate loss
@@ -134,3 +135,14 @@ class DetrDetectionOutput:
     class_logits: torch.Tensor
     boxes: torch.Tensor
     loss: Optional[torch.Tensor] = None
+
+    def __getitem__(self, i):
+        assert isinstance(i, int), f"Index of {self.__class__.__name__} must be integer"
+        return DetrDetectionOutput(
+            class_logits=self.class_logits[i],
+            boxes=self.boxes[i],
+            loss=self.loss,
+        )
+
+    def __post_init__(self):
+        self.classes, self.class_scores = self.class_logits.max(dim=-1)

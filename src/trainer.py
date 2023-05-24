@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from lightning import Fabric
 from torch import nn, optim
+from torchvision.transforms import functional as TF
 from torch.utils.data import DataLoader
 from pydantic import BaseModel, Field
 from tqdm import tqdm
@@ -17,7 +18,7 @@ from tensorboardX import SummaryWriter
 
 from .processors import DetrProcessor
 from .models import MeganeDetector
-from .data import Dataset, MeganeDataset
+from .data import Dataset, MeganeDataset, Sample, pretty
 from .structures import ModelConfig, TrainConfig
 from .utils import Statistics
 
@@ -74,7 +75,7 @@ class Trainer:
             self.optimizer,
             max_lr=train_config.lr,
             pct_start=0.1,
-            # final_div_factor=2,
+            final_div_factor=2,
             total_steps=train_config.total_steps,
         )
         self.logger = SummaryWriter(logdir=model_config.log_path)
@@ -115,8 +116,8 @@ class Trainer:
             )
 
             lr = lr_scheduler.get_last_lr()[0]
-            writer.add_scalar("loss", output.loss.item(), step)
-            writer.add_scalar("lr", lr, step)
+            writer.add_scalar("train/loss", output.loss.item(), step)
+            writer.add_scalar("train/lr", lr, step)
 
             train_loss.append(output.loss.item())
             # self.metrics.lr = lr_scheduler.get_last_lr()[0]
@@ -128,18 +129,18 @@ class Trainer:
                 self.save_model(self.model_config.latest_weight_path)
                 train_loss = Statistics(np.mean)
 
-            # if step % validate_every == 0:
-            #     self.validate()
+            if step % validate_every == 0:
+                self.validate(step=step)
             writer.flush()
 
         # Save one last time
         self.save_model()
 
     @torch.no_grad()
-    def validate(self, loader=None):
-        model = self.fabric.setup(self.model)
-        model = model.eval()
-        loader = self.fabric.setup_dataloaders(loader or self.validate_loader)
+    def validate(self, step=None):
+        model = self.fabric.setup(self.model).eval()
+        loader = self.fabric.setup_dataloaders(self.validate_loader)
+        writer = self.logger
 
         def dict_get_index(d, i):
             return {k: v[i] for k, v in d.items()}
@@ -148,62 +149,36 @@ class Trainer:
 
         losses = []
         final_outputs = []
-        metrics = defaultdict(list)
-
-        metrics = {k: Statistics(np.mean) for k in vars(self.metrics).keys()}
         for batch in tqdm(loader, "validating"):
-            batch_size = batch["texts"].shape[0]
+            batch_size = batch["image"].shape[0]
             outputs = model(batch)
+            loss = outputs.loss.item()
+            writer.add_scalar("validation/loss", loss)
+
             for i in range(batch_size):
-                sample = batch[i]
-
-                # Relation scores
-                score = get_tensor_f1(outputs.relations, sample.adj).cpu().item()
-                metrics["f1_relations"].append(score)
-
-                # Classification score
-                score = get_tensor_f1(outputs.classes, sample.classes).cpu().item()
-                metrics["f1_classification"].append(score)
-
-                # Extract
-                sample = sample.to_numpy()
                 output = outputs[i]
+                encoded = batch[i]
 
-                # Postprocess GT
-                gt = post_process(sample)
+                gt = self.processor.decode(encoded.to_numpy())
+                encoded.boxes = output.boxes
+                encoded.class_scores = output.class_scores
+                encoded.classes = output.classes
+                pr = self.processor.decode(encoded.to_numpy())
+                image = encoded.image
+                final_outputs.append([image, pr, gt])
+            #     break
+            # break
 
-                # Postprocess PR
-                sample.classes = output.classes.cpu().numpy()
-                sample.adj = output.relations.cpu().numpy()
-                pr = post_process(sample)
-
-                # End to end format
-                pr = prettify_sample(pr, self.model_config.classes)
-                gt = prettify_sample(gt, self.model_config.classes)
-
-                # End to end score
-                score = get_e2e_f1(pr, gt)
-                metrics["f1_end2end"].append(score)
-
-                final_outputs.append((pr, gt))
-            metrics["validation_loss"].append(outputs.loss.item())
-
-        for pr, gt in random.choices(final_outputs, k=1):
-            tqdm.write("PR:\t" + str(pr))
-            tqdm.write("+" * 3)
-            tqdm.write("GT:\t" + str(gt))
-            tqdm.write("-" * 30)
-
-        f1_end2end = metrics.pop("f1_end2end")
-        if self.metrics.f1_end2end.update(f1_end2end.get()):
-            self.save_model(self.model_config.best_weight_path)
-
-        for k, v in metrics.items():
-            metric = getattr(self.metrics, k)
-            if isinstance(metric, Metric):
-                metric.update(v.get())
-
-        tqdm.write(pformat(vars(self.metrics)))
+        for inp, pr, gt in random.choices(final_outputs, k=1):
+            pr = pretty(pr)
+            gt = pretty(gt)
+            writer.add_image('validation/input-image', inp, step)
+            writer.add_image('validation/pr-output', TF.to_tensor(pr), step)
+            writer.add_image('validation/gt-output', TF.to_tensor(gt), step)
+            # tqdm.write("PR:\t" + str(pr))
+            # tqdm.write("+" * 3)
+            # tqdm.write("GT:\t" + str(gt))
+            # tqdm.write("-" * 30)
 
     def save_model(self, save_path):
         dirname = os.path.dirname(save_path)
