@@ -77,7 +77,7 @@ class DetrProcessor:
 
     def decode(self, encoded: Encoded) -> Sample:
         # decode image
-        image = common.pil_to_np(encoded.image)
+        image = common.np_to_pil(encoded.image)
         image = image.resize([encoded.image_width, encoded.image_height])
 
         # decode boxes
