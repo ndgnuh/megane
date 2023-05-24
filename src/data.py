@@ -12,10 +12,17 @@ Box = Tuple[Point, Point, Point, Point]
 
 class Sample(BaseModel):
     image: Any
-    boxes: List[Box] = Field(default_factory=list)
-    classes: List[int] = Field(default_factory=list)
-    box_scores: List[float] = Field(default_factory=list)
-    class_scores: List[float] = Field(default_factory=list)
+    boxes: Optional[List[Box]] = None
+    classes: Optional[List[int]] = None
+    scores: Optional[List[float]] = None
+
+    @property
+    def image_width(self):
+        return self.image.width
+
+    @property
+    def image_height(self):
+        return self.image.width
 
 
 class MeganeDataset(Dataset):
@@ -26,9 +33,14 @@ class MeganeDataset(Dataset):
 
     def __getitem__(self, idx):
         image, targets = self.sroie[idx]
+        image = TF.to_pil_image(image)
         boxes = targets["boxes"]
-        sample =  Sample(
-            image=TF.to_pil_image(image),
+        boxes[..., 0] = boxes[..., 0] * image.width
+        boxes[..., 1] = boxes[..., 1] * image.height
+        boxes = boxes.round().astype(int)
+
+        sample = Sample(
+            image=image,
             boxes=boxes.tolist(),
             classes=[1] * len(boxes),
         )
