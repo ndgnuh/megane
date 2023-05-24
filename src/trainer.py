@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
-from .processors import DetrProcessor
+from .processors import get_processor
 from .models import MeganeDetector
 from .data import Dataset, MeganeDataset, Sample, pretty
 from .structures import ModelConfig, TrainConfig
@@ -42,9 +42,7 @@ class Trainer:
     def __init__(self, train_config: TrainConfig, model_config: ModelConfig):
         # Initialize model
         self.model = MeganeDetector(model_config)
-        self.processor = DetrProcessor(
-            image_width=model_config.image_width, image_height=model_config.image_height
-        )
+        self.processor = get_processor(model_config)
         self.fabric = Fabric(accelerator="auto")
         try:
             weights = utils.load_pt(model_config.pretrained_weights)
@@ -161,7 +159,7 @@ class Trainer:
 
                 gt = self.processor.decode(encoded.to_numpy())
                 encoded.boxes = output.boxes
-                encoded.class_scores = output.class_scores
+                encoded.scores = output.class_scores
                 encoded.classes = output.classes
                 pr = self.processor.decode(encoded.to_numpy())
                 image = encoded.image
@@ -172,9 +170,9 @@ class Trainer:
         for inp, pr, gt in random.choices(final_outputs, k=1):
             pr = pretty(pr)
             gt = pretty(gt)
-            writer.add_image('validation/input-image', inp, step)
-            writer.add_image('validation/pr-output', TF.to_tensor(pr), step)
-            writer.add_image('validation/gt-output', TF.to_tensor(gt), step)
+            writer.add_image('validation-sample/input-image', inp, step)
+            writer.add_image('validation-sample/pr-output', TF.to_tensor(pr), step)
+            writer.add_image('validation-sample/gt-output', TF.to_tensor(gt), step)
             # tqdm.write("PR:\t" + str(pr))
             # tqdm.write("+" * 3)
             # tqdm.write("GT:\t" + str(gt))
