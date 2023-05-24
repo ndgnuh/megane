@@ -7,6 +7,8 @@ pydantic
 pytest
 lenses
 tensorboardX
+tensorboard
+crc32c
 matplotlib
 
 # Temporary for the data and back bone only

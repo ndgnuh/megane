@@ -64,19 +64,20 @@ class Trainer:
                 data, collate_fn=self.processor.collate, **train_config.dataloader
             )
             return loader
+
         self.train_loader = make_loader(True)
         self.validate_loader = make_loader(False)
 
         # Optimizer
         self.optimizer = optim.AdamW(self.model.parameters(), lr=train_config.lr)
-        # self.lr_scheduler = optim.lr_scheduler.OneCycleLR(
-        #     self.optimizer,
-        #     max_lr=train_config.lr,
-        #     pct_start=0.01,
-        #     # final_div_factor=2,
-        #     total_steps=train_config.total_steps,
-        # )
-        self.logger = SummaryWriter(logdir=f"logs/{model_config.name}")
+        self.lr_scheduler = optim.lr_scheduler.OneCycleLR(
+            self.optimizer,
+            max_lr=train_config.lr,
+            pct_start=0.1,
+            # final_div_factor=2,
+            total_steps=train_config.total_steps,
+        )
+        self.logger = SummaryWriter(logdir=model_config.log_path)
 
         # Store configs
         self.train_config = train_config
@@ -91,7 +92,7 @@ class Trainer:
 
         fabric = self.fabric
         model, optimizer = self.fabric.setup(self.model, self.optimizer)
-        # lr_scheduler = self.lr_scheduler
+        lr_scheduler = self.lr_scheduler
         train_loader = self.fabric.setup_dataloaders(self.train_loader)
 
         pbar = tqdm(
@@ -99,6 +100,7 @@ class Trainer:
             total=total_steps,
             dynamic_ncols=True,
         )
+        writer = self.logger
 
         train_loss = Statistics(np.mean)
         for step, batch in pbar:
@@ -111,8 +113,11 @@ class Trainer:
             pbar.set_description(
                 f"#{step}/{total_steps} loss: {output.loss.item():.4e}"
             )
-            
-            self.logger.add_scalar("loss", output.loss.item(), step)
+
+            lr = lr_scheduler.get_last_lr()[0]
+            writer.add_scalar("loss", output.loss.item(), step)
+            writer.add_scalar("lr", lr, step)
+
             train_loss.append(output.loss.item())
             # self.metrics.lr = lr_scheduler.get_last_lr()[0]
             if step % print_every == 0:
@@ -125,6 +130,7 @@ class Trainer:
 
             # if step % validate_every == 0:
             #     self.validate()
+            writer.flush()
 
         # Save one last time
         self.save_model()
@@ -147,7 +153,7 @@ class Trainer:
         metrics = {k: Statistics(np.mean) for k in vars(self.metrics).keys()}
         for batch in tqdm(loader, "validating"):
             batch_size = batch["texts"].shape[0]
-            outputs: KieOutput = model(batch)
+            outputs = model(batch)
             for i in range(batch_size):
                 sample = batch[i]
 

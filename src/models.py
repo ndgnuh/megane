@@ -67,8 +67,8 @@ class HungarianMatchingLoss(nn.Module):
             pr_boxes_np = self.to_np(pr_boxes_i)
             gt_boxes_np = self.to_np(gt_boxes_i)
             mask, gt_order = get_matching_index(pr_boxes_np, gt_boxes_np)
-            mask = torch.BoolTensor(mask, device=device)
-            gt_order = torch.LongTensor(gt_order, device=device)
+            mask = torch.BoolTensor(mask).to(device)
+            gt_order = torch.LongTensor(gt_order).to(device)
 
             # Localization loss
             neg = pr_boxes_i[~mask]

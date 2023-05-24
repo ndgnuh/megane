@@ -67,4 +67,7 @@ class ModelConfig(BaseModel):
 
     @property
     def log_path(self):
-        return path.join(consts.log_path, self.name)
+        from datetime import datetime
+        now = datetime.now().isoformat()
+        name = f"{self.name}-{now}"
+        return path.join(consts.log_directory, name)
