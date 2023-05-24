@@ -1,10 +1,19 @@
 from typing import *
+from enum import Enum
 from os import path
 
 from pydantic import BaseModel, Field, validator
 
 from ..utils import read
 from .. import consts
+
+
+class ModelType(Enum):
+    DETR_POLYGON = "detr-polygon"
+    DETR_XYXY = "detr-xyxy"
+    PRIOR_XYWH = "prior-xywh"
+    DBNET = "dbnet"
+
 
 class TrainConfig(BaseModel):
     # Scheduling
@@ -34,8 +43,8 @@ class TrainConfig(BaseModel):
         return cls.parse_obj(config)
 
 
-
 class ModelConfig(BaseModel):
+    type: ModelType
     classes: List[str]
     num_box_dims: int
     image_width: int
@@ -68,6 +77,7 @@ class ModelConfig(BaseModel):
     @property
     def log_path(self):
         from datetime import datetime
+
         now = datetime.now().isoformat()
         name = f"{self.name}-{now}"
         return path.join(consts.log_directory, name)

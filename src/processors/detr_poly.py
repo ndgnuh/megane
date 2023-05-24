@@ -4,7 +4,7 @@ from typing import Optional, get_type_hints, List, Dict
 import numpy as np
 from PIL import Image
 
-from .data import Sample
+from ..data import Sample
 
 
 class BatchEncode(dict):
