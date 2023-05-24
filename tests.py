@@ -2,6 +2,19 @@ import numpy as np
 from PIL import Image
 
 from src import processors as P
+from src.data import MeganeDataset, pretty
+
+dataset = MeganeDataset()
+sample = dataset[0]
+
+
+def test_detr_processor():
+    proc = P.DetrProcessor4(1000, 1000)
+    enc = proc.encode(sample)
+    dec = proc.decode(enc)
+    assert (np.array(sample.boxes) == np.array(dec.boxes)).all()
+    assert sample.image_width == dec.image_width
+    assert sample.image_height == dec.image_height
 
 
 def test_box_convert():
