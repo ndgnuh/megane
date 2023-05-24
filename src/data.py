@@ -6,7 +6,7 @@ from doctr.datasets import SROIE
 from torch.utils.data import Dataset
 from torchvision.transforms import functional as TF
 
-Point = Tuple[float, float]
+Point = Tuple[int, int]
 Box = Tuple[Point, Point, Point, Point]
 
 
@@ -61,10 +61,7 @@ def pretty(sample: Sample) -> Image:
     image = sample.image.copy()
     w, h = image.size
     ctx = ImageDraw.Draw(image)
-    boxes = np.array(sample.boxes)
-    boxes[..., 0] = boxes[..., 0] * w
-    boxes[..., 1] = boxes[..., 1] * h
-    for box in boxes:
+    for box in sample.boxes:
         polygon = [(int(x), int(y)) for x, y in box]
         ctx.polygon(polygon, outline=(255, 0, 0), width=2)
     return image
