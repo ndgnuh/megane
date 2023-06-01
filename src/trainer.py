@@ -1,4 +1,5 @@
 import random
+from datetime import datetime
 
 import torch
 import numpy as np
@@ -41,14 +42,15 @@ def loop_loader(loader, total_steps: int):
 
 class Trainer:
     def __init__(self):
-        image_size = 640
+        image_size = 416
         assert image_size % 32 == 0
         train_data = "train.txt"
         val_data = "val.txt"
         classes = ["text", "noise"]
         dataloader_config = {"batch_size": 4}
+        hidden_size = 256
         lr = 1e-4
-        logdir = "log/expm"
+        logdir = "log/expm-" + datetime.now().isoformat()
         total_steps = 10000
         print_every = 100
         validate_every = 100
@@ -61,7 +63,7 @@ class Trainer:
         self.model = Model(
             {
                 "image_size": image_size,
-                "hidden_size": 224,
+                "hidden_size": hidden_size,
                 "num_classes": 2,
             }
         )
@@ -119,10 +121,11 @@ class Trainer:
                 logger.flush()
 
             if step % validate_every == 0:
-                self.validate()
+                self.validate(step)
+                logger.flush()
 
     @torch.no_grad()
-    def validate(self):
+    def validate(self, step=0):
         model = self.fabric.setup(self.model).eval()
         dataloader = self.fabric.setup_dataloaders(self.val_loader)
         num_batches = len(dataloader)
@@ -133,11 +136,10 @@ class Trainer:
         losses = []
 
         # Visualize index
-        # v_index = random.randint(0, num_batches - 1)
-        v_index = 0
+        v_index = random.randint(0, num_batches - 1)
 
         pbar = tqdm(dataloader, "Validating")
-        for step, (images, targets) in enumerate(pbar):
+        for idx, (images, targets) in enumerate(pbar):
             # Step
             outputs = model(images)
             loss = model.compute_loss(outputs, targets).item()
@@ -145,9 +147,9 @@ class Trainer:
             # Logging
             pbar.set_postfix({"loss": loss})
             losses.append(loss)
-            if step == v_index:
+            if idx == v_index:
                 image = _gen_image_preview(outputs)
-                logger.add_image("validate/sample", image)
+                logger.add_image("validate/sample", image, step)
 
         # Logging
         loss = np.mean(losses)
@@ -165,11 +167,11 @@ def _gen_image_preview(outputs: Tensor):
         image:
             Tensor of shape [1, H, W]
     """
-    outputs = torch.clamp(outputs, 0, 1)
+    outputs = torch.softmax(outputs, dim=1)
     n = random.randint(0, outputs.shape[0] - 1)
     images = [image for image in outputs[n]]
     num_imgs = len(images)
     image = torch.cat(images, dim=-1)
     image = image.unsqueeze(0)
-    image = TF.resize(image, (640, 640 * num_imgs), antialias=True)
+    image = TF.resize(image, (640, 640 * num_imgs), antialias=False)
     return image

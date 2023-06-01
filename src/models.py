@@ -94,6 +94,7 @@ class Model(nn.Module):
         self.image_size = config["image_size"]
         self.hidden_size = config["hidden_size"]
         self.num_classes = config["num_classes"]
+        self.num_special_classes = 2
         self.aux_size = self.hidden_size // 4
 
         self.backbone = self._mk_backbone()
@@ -102,8 +103,10 @@ class Model(nn.Module):
 
         # Num class + 1 to compensate for background (no class)
         self.head = nn.Conv2d(
-            self.hidden_size, self.num_classes + 1,
-            kernel_size=(1, 3), padding=(0, 1),
+            self.hidden_size,
+            self.num_classes + self.num_special_classes,
+            kernel_size=(1, 3),
+            padding=(0, 1),
         )
 
     def _mk_backbone(self):
@@ -129,7 +132,7 @@ class Model(nn.Module):
 
     def encode_sample(self, sample: Sample):
         """Mapping from plain sample to model domain
-        
+
         Args:
             sample:
                 Input `Sample` data.
@@ -141,6 +144,7 @@ class Model(nn.Module):
                 Segmentation masks for training the model.
         """
         import numpy as np
+
         output_size = self.image_size // 2
         image = utils.prepare_input(sample.image, self.image_size, self.image_size)
         image = torch.FloatTensor(image)
@@ -152,14 +156,24 @@ class Model(nn.Module):
         # Object masks
         masks = []
         for c_idx in range(self.num_classes):
-            id_mask = (classes == c_idx)
-            mask = utils.draw_mask(output_size, output_size, shrink_boxes[id_mask], copy=False)
+            id_mask = classes == c_idx
+            mask = utils.draw_mask(
+                output_size, output_size, shrink_boxes[id_mask], copy=False
+            )
             masks.append(mask)
 
         # background mask
-        bg_mask = 1 - utils.draw_mask(output_size, output_size, shrink_boxes, copy=False)
+        bg_mask = 1 - utils.draw_mask(
+            output_size, output_size, shrink_boxes, copy=False
+        )
+        border_mask = utils.draw_mask(
+            output_size, output_size, boxes, copy=False
+        ) - (1 - bg_mask)
+
+
         masks.insert(0, bg_mask)
-        mask = np.stack(masks, axis=0) * 1.25
+        masks.insert(1, border_mask)
+        mask = np.stack(masks, axis=0)
         mask = torch.FloatTensor(mask)
         return image, mask
 
@@ -172,5 +186,12 @@ class Model(nn.Module):
             targets:
                 Encoded targets of shape [N, C, H, W]
         """
+        # positives = (targets[:, 0, :, :] == 0).unsqueeze(1).repeat([1, targets.shape[1], 1, 1])
+        # negatives = ~positives
+        # if torch.count_nonzero(positives) == 0 or torch.count_nonzero(negatives) == 0:
         loss = F.cross_entropy(outputs, targets)
+        # else:
+        #     p_loss = F.cross_entropy(outputs[positives], targets[positives])
+        #     n_loss = F.cross_entropy(outputs[negatives], targets[negatives])
+        #     loss = p_loss + n_loss
         return loss
