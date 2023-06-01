@@ -1,6 +1,7 @@
 from typing import *
 
 import torch
+from torch.nn import functional as F
 from torch import nn, Tensor, no_grad
 from torchvision.models import mobilenet_v3_small, mobilenet_v3_large
 from torchvision.models._utils import IntermediateLayerGetter
@@ -127,6 +128,18 @@ class Model(nn.Module):
         return outputs
 
     def encode_sample(self, sample: Sample):
+        """Mapping from plain sample to model domain
+        
+        Args:
+            sample:
+                Input `Sample` data.
+
+        Returns:
+            image:
+                Torch image reprensentation of input image.
+            target:
+                Segmentation masks for training the model.
+        """
         import numpy as np
         output_size = self.image_size // 2
         image = utils.prepare_input(sample.image, self.image_size, self.image_size)
@@ -146,5 +159,18 @@ class Model(nn.Module):
         # background mask
         bg_mask = 1 - utils.draw_mask(output_size, output_size, shrink_boxes, copy=False)
         masks.insert(0, bg_mask)
-        mask = np.stack(masks, axis=0)
+        mask = np.stack(masks, axis=0) * 1.25
+        mask = torch.FloatTensor(mask)
         return image, mask
+
+    def compute_loss(self, outputs, targets):
+        """Compute prediction loss
+
+        Args:
+            outputs:
+                Model outputs of shape [N, C, H, W]
+            targets:
+                Encoded targets of shape [N, C, H, W]
+        """
+        loss = F.cross_entropy(outputs, targets)
+        return loss
