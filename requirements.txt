@@ -1,0 +1,7 @@
+numpy
+torch
+torchvision
+lightning
+pylint
+pyclean
+gdown
