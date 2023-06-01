@@ -1,4 +1,5 @@
 import json
+import os
 from base64 import b64decode
 from functools import lru_cache
 from typing import List, Tuple, Optional, Callable
@@ -107,9 +108,12 @@ class TextDetectionDataset(Dataset):
                  transform: Optional[Callable] = None,
                  cache: Optional[bool] = True):
         super().__init__()
+        root_dir = path.dirname(index)
         with open(index, 'r') as fp:
-            sample_paths = [line.strip() for line in fp.readlines()]
-        assert all(path.isfile(sample_path) for sample_path in sample_paths)
+            sample_paths = [line.strip("\n") for line in fp.readlines()]
+            sample_paths = [path.join(root_dir, sample_path) for sample_path in sample_paths]
+        for sample_path in sample_paths:
+            assert path.isfile(sample_path), f"{sample_path} does not exists"
         if cache:
             _load_sample_labelme = lru_cache(load_sample_labelme)
         else:
