@@ -82,7 +82,7 @@ def load_sample_labelme(sample_path, classes):
     return Sample(
         image = image,
         boxes = boxes,
-        classes = classes
+        classes = class_indices
     )
 
 

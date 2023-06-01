@@ -7,6 +7,7 @@ from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.ops import FeaturePyramidNetwork
 
 from .data import Sample
+from . import utils
 
 
 def _conv_norm_act(in_channels: int, out_channels: int, *a, **k):
@@ -126,4 +127,24 @@ class Model(nn.Module):
         return outputs
 
     def encode_sample(self, sample: Sample):
-        pass
+        import numpy as np
+        output_size = self.image_size // 2
+        image = utils.prepare_input(sample.image, self.image_size, self.image_size)
+        image = torch.FloatTensor(image)
+
+        boxes = np.array(sample.boxes)
+        shrink_boxes = utils.shrink(boxes)
+        classes = np.array(sample.classes)
+
+        # Object masks
+        masks = []
+        for c_idx in range(self.num_classes):
+            id_mask = (classes == c_idx)
+            mask = utils.draw_mask(output_size, output_size, shrink_boxes[id_mask], copy=False)
+            masks.append(mask)
+
+        # background mask
+        bg_mask = 1 - utils.draw_mask(output_size, output_size, shrink_boxes, copy=False)
+        masks.insert(0, bg_mask)
+        mask = np.stack(masks, axis=0)
+        return image, mask
