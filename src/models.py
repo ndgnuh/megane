@@ -88,6 +88,15 @@ class UpscaleConcat(nn.Module):
         return output
 
 
+class BBSH(nn.Module):
+    def __init__(self, hidden_size, num_classes):
+        super().__init__()
+
+        # Background and threshold
+        self.bg_tr = nn.Conv2d(hidden_size, 2)
+        # self.outputs = nn.Conv2d(
+
+
 class Model(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -102,6 +111,7 @@ class Model(nn.Module):
         self.neck = UpscaleConcat(self.aux_size, 4)
 
         # Num class + 1 to compensate for background (no class)
+        # self.head = PredictionHead(hidden_size, num_classes, num_special_classes)
         self.head = nn.Conv2d(
             self.hidden_size,
             self.num_classes + self.num_special_classes,
@@ -129,6 +139,9 @@ class Model(nn.Module):
         features = self.neck(features)
         outputs = self.head(features)
         return outputs
+
+    def decode_sample(self, masks):
+        pass
 
     def encode_sample(self, sample: Sample):
         """Mapping from plain sample to model domain
@@ -166,10 +179,9 @@ class Model(nn.Module):
         bg_mask = 1 - utils.draw_mask(
             output_size, output_size, shrink_boxes, copy=False
         )
-        border_mask = utils.draw_mask(
-            output_size, output_size, boxes, copy=False
-        ) - (1 - bg_mask)
-
+        border_mask = utils.draw_mask(output_size, output_size, boxes, copy=False) - (
+            1 - bg_mask
+        )
 
         masks.insert(0, bg_mask)
         masks.insert(1, border_mask)
@@ -186,12 +198,13 @@ class Model(nn.Module):
             targets:
                 Encoded targets of shape [N, C, H, W]
         """
-        # positives = (targets[:, 0, :, :] == 0).unsqueeze(1).repeat([1, targets.shape[1], 1, 1])
-        # negatives = ~positives
-        # if torch.count_nonzero(positives) == 0 or torch.count_nonzero(negatives) == 0:
-        loss = F.cross_entropy(outputs, targets)
-        # else:
-        #     p_loss = F.cross_entropy(outputs[positives], targets[positives])
-        #     n_loss = F.cross_entropy(outputs[negatives], targets[negatives])
-        #     loss = p_loss + n_loss
+        # Segmentation mask loss, consider this a localization loss
+        l_loss = F.l1_loss(outputs, targets)
+
+        # The classification loss
+        # The loss is only calculated for each GT and each target labels
+        # but not target labels against each others
+        c_loss = F.cross_entropy(outputs, targets)
+
+        loss = c_loss + l_loss
         return loss
