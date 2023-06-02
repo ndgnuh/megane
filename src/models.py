@@ -140,12 +140,13 @@ class BgThreshTextNoise(nn.Module):
 
         # Background and threshold
         self.heads = nn.ModuleList([nn.Conv2d(hidden_size, 1, 1) for _ in range(4)])
+        self.inferring = False
 
-    def forward(self, features, return_all=False):
-        if self.training or return_all:
-            outputs = torch.cat([conv(features) for conv in self.heads], dim=1)
-        else:
+    def forward(self, features, returns_all=False):
+        if self.inferring:
             outputs = self.heads[self.conv_text_class](features)
+        else:
+            outputs = torch.cat([conv(features) for conv in self.heads], dim=1)
         return outputs
 
     def encode_sample(self, sample: Sample):
@@ -201,11 +202,11 @@ class BgThreshTextNoise(nn.Module):
 
         # Loss for bg, text and text threshold
         idx = [0, 1, 2]
-        c_loss_t = F.cross_entropy(outputs[:, idx], f_targets[:, idx] * 1.0)
+        c_loss_t = F.cross_entropy(outputs[:, idx], f_targets[:, idx])
 
         # Loss for bg and noise
         idx = [0, 3]
-        c_loss_n = F.cross_entropy(outputs[:, idx], f_targets[:, idx] * 1.0)
+        c_loss_n = F.cross_entropy(outputs[:, idx], f_targets[:, idx])
 
         # Loss for text and noise
         gt_bg, gt_tt, gt_tp, gt_np = targets.chunk(4, dim=1)
@@ -250,9 +251,9 @@ class Model(nn.Module):
         fpn = FeaturePyramidNetwork(channels, self.hidden_size // len(channels))
         return fpn
 
-    def forward(self, images: Tensor):
+    def forward(self, images: Tensor, **k):
         features = self.backbone(images)
         features = self.fpn(features)
         features = self.neck(features)
-        outputs = self.head(features)
+        outputs = self.head(features, **k)
         return outputs
