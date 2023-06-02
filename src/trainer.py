@@ -42,18 +42,18 @@ def loop_loader(loader, total_steps: int):
 
 class Trainer:
     def __init__(self):
-        image_size = 416
+        image_size = 864
         assert image_size % 32 == 0
-        train_data = "train.txt"
-        val_data = "val.txt"
+        train_data = "data/train.txt"
+        val_data = "data/val.txt"
         classes = ["text", "noise"]
-        dataloader_config = {"batch_size": 4}
+        dataloader_config = {"batch_size": 2}
         hidden_size = 256
         lr = 1e-4
         logdir = "log/expm-" + datetime.now().isoformat()
-        total_steps = 10000
+        total_steps = 1000000
         print_every = 100
-        validate_every = 100
+        validate_every = 250
         self.latest_model_path = "latest.pt"
 
         #
@@ -64,7 +64,7 @@ class Trainer:
             {
                 "image_size": image_size,
                 "hidden_size": hidden_size,
-                "num_classes": 2,
+                "num_classes": len(classes),
             }
         )
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
@@ -124,6 +124,9 @@ class Trainer:
                 self.validate(step)
                 logger.flush()
 
+                torch.save(model.state_dict(), "model.pt")
+                torch.save(outputs.cpu().detach(), "sample-output.pt")
+
     @torch.no_grad()
     def validate(self, step=0):
         model = self.fabric.setup(self.model).eval()
@@ -167,7 +170,8 @@ def _gen_image_preview(outputs: Tensor):
         image:
             Tensor of shape [1, H, W]
     """
-    outputs = torch.softmax(outputs, dim=1)
+    # This actually gives much better results than sigmoid, softmax or thresholding
+    outputs = torch.clip(torch.tanh(outputs), 0, 1)
     n = random.randint(0, outputs.shape[0] - 1)
     images = [image for image in outputs[n]]
     num_imgs = len(images)
