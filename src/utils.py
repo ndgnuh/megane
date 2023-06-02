@@ -39,13 +39,15 @@ def prepare_input(image: Image, image_width: int, image_height: int):
     image = image.convert("RGB")
     image = image.resize((image_width, image_height))
     image = np.array(image)
-    image = image.astype('float32') / 255
+    image = image.astype("float32") / 255
     h, w, c = 0, 1, 2
     image = image.transpose([c, h, w])
     return image
 
 
-def draw_mask(width: int, height: int, boxes: np.ndarray, copy: bool):
+def draw_mask(
+    width: int, height: int, boxes: np.ndarray, copy: bool, mode: str = "max"
+):
     """Draw binary mask using bounding boxes.
     The mask region has value 1 whenever there's a box in that region.
 
@@ -58,6 +60,10 @@ def draw_mask(width: int, height: int, boxes: np.ndarray, copy: bool):
             A numpy array reprensenting normalized bounding boxes of shape [L, 4].
         copy:
             Whether to copy when de-normalizing the boxes.
+        mode:
+            Either 'max', 'min' or 'round'. Mode max will try to maximize the box area.
+            Round would not try to do anything. Min will try to minimize the box area.
+            Default: 'max'
     Returns:
         A numpy array of shape [H, W] which is the drawn mask.
     """
@@ -66,11 +72,26 @@ def draw_mask(width: int, height: int, boxes: np.ndarray, copy: bool):
         boxes = boxes.copy()
     boxes[:, [0, 2]] *= width
     boxes[:, [1, 3]] *= height
-    boxes = boxes.round().astype(int)
 
-    for (x1, y1, x2, y2) in boxes:
+    # Bound rounding
+    if mode == "max":
+        boxes[:, [0, 1]] = np.floor(boxes[:, [0, 1]])
+        boxes[:, [2, 3]] = np.ceil(boxes[:, [2, 3]])
+        boxes = boxes.astype(int)
+    elif mode == "min":
+        boxes[:, [0, 1]] = np.ceil(boxes[:, [0, 1]])
+        boxes[:, [2, 3]] = np.floor(boxes[:, [2, 3]])
+        boxes = boxes.astype(int)
+    elif mode == "round":
+        boxes = boxes.round()
+    else:
+        raise ValueError(f"Unsupported mode {mode}")
+
+    boxes = boxes.astype(int)
+    for x1, y1, x2, y2 in boxes:
         mask[y1:y2, x1:x2] = 1
     return mask
+
 
 def shrink(boxes: np.ndarray, r: float = 0.4):
     """Shrink bounding boxes using formular from DBNet.
@@ -87,11 +108,54 @@ def shrink(boxes: np.ndarray, r: float = 0.4):
     h = boxes[:, 3] - boxes[:, 1]
     area = w * h
     length = (w + h) * 2
-    d = (1 - r**2) * area / length
-    new_boxes = np.stack([
-        boxes[:, 0] + d,
-        boxes[:, 1] + d,
-        boxes[:, 2] - d,
-        boxes[:, 3] - d
-    ], axis=1)
+    d = (1.0 - r**2) * area / length
+    new_boxes = np.stack(
+        [boxes[:, 0] + d, boxes[:, 1] + d, boxes[:, 2] - d, boxes[:, 3] - d], axis=1
+    )
     return new_boxes
+
+
+def expand(boxes: np.ndarray, r: float = 1.5):
+    """Expand bounding boxes using formular from DBNet.
+
+    Expand distance = A * r / L
+
+    Args:
+        boxes:
+            numpy array of shape [L, 4]
+        r:
+            Shrink ratio, default 0.4
+    """
+    w = boxes[:, 2] - boxes[:, 0]
+    h = boxes[:, 3] - boxes[:, 1]
+    area = w * h
+    length = (w + h) * 2
+    d = 1.0 * r * area / length
+    new_boxes = np.stack(
+        [boxes[:, 0] - d, boxes[:, 1] - d, boxes[:, 2] + d, boxes[:, 3] + d], axis=1
+    )
+    return new_boxes
+
+def shrink_expand(boxes: np.ndarray, r: float = 0.4):
+    """Shrink and expand bounding boxes using the shrink formular from DBNet.
+
+    Distance = (1 - r**2) * Area / Length
+
+    Args:
+        boxes:
+            numpy array of shape [L, 4]
+        r:
+            Shrink ratio, default 0.4
+    """
+    w = boxes[:, 2] - boxes[:, 0]
+    h = boxes[:, 3] - boxes[:, 1]
+    area = w * h
+    length = (w + h) * 2
+    d = (1.0 - r**2) * area / length
+    shrinked = np.stack(
+        [boxes[:, 0] + d, boxes[:, 1] + d, boxes[:, 2] - d, boxes[:, 3] - d], axis=1
+    )
+    expanded = np.stack(
+        [boxes[:, 0] - d, boxes[:, 1] - d, boxes[:, 2] + d, boxes[:, 3] + d], axis=1
+    )
+    return shrinked, expanded
