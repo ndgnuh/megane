@@ -184,35 +184,47 @@ class BgThreshTextNoise(nn.Module):
         noise_mask = dmask(boxes, self.noise_class, "round")
         thres_mask = dmask(expand, self.text_class, "max")
         text_mask = dmask(shrink, self.text_class, "max")
-        bg_mask = np.ones([output_size, output_size], dtype=bool)
 
         # Target masks
         thres_mask = thres_mask & (~text_mask)
-        bg_mask = bg_mask & (~text_mask) & (~noise_mask) & (~text_mask)
-        masks = np.stack((bg_mask, thres_mask, text_mask, noise_mask), axis=0)
+        masks = np.stack((thres_mask, text_mask, noise_mask), axis=0)
 
         return image, masks
 
     def compute_loss(self, outputs, targets):
-        f_targets = targets * 1.0
+        # Unpack GT and PR
+        # text threshold, text probs, noise probs
+        gt_tt, gt_tp, gt_np = targets.chunk(targets.shape[-3], dim=-3)
+        pr_bg, pr_tt, pr_tp, pr_np = outputs.chunk(outputs.shape[-3], dim=-3)
+
         # Basic segmentation loss
-        loss = F.l1_loss(outputs, f_targets)
-        loss = F.mse_loss(outputs, f_targets) + loss
+        gt_bg = torch.ones_like(gt_tt)
+        gt_bg = gt_bg & (~(gt_tt | gt_tp | gt_np))
+        _targets = torch.cat([gt_bg, gt_tt, gt_tp, gt_np], dim=1) * 1.0
+        loss = F.l1_loss(outputs, _targets)
+        loss = F.mse_loss(outputs, _targets) + loss
         loss = loss / 2
 
         # Loss for bg, text and text threshold
-        idx = [0, 1, 2]
-        c_loss_t = F.cross_entropy(outputs[:, idx], f_targets[:, idx])
+        gt_bg = torch.ones_like(gt_tt)
+        gt_bg = gt_bg & (~gt_tt) & (~gt_tp)
+        _outputs = torch.cat([pr_bg, pr_tt, pr_tp], dim=1)
+        _targets=  torch.cat([gt_bg, gt_tt, gt_tp], dim=1) * 1.0
+        c_loss_t = F.cross_entropy(_outputs, _targets)
 
         # Loss for bg and noise
-        idx = [0, 3]
-        c_loss_n = F.cross_entropy(outputs[:, idx], f_targets[:, idx])
+        gt_bg = torch.ones_like(gt_tt)
+        gt_bg = gt_bg & (~gt_np)
+        _outputs = torch.cat([pr_bg, pr_np], dim=1)
+        _targets=  torch.cat([gt_bg, gt_np], dim=1) * 1.0
+        c_loss_n = F.cross_entropy(_outputs, _targets)
 
         # Loss for text and noise
-        gt_bg, gt_tt, gt_tp, gt_np = targets.chunk(4, dim=1)
-        gt_np = gt_np & (~gt_tt) & (~gt_tp)
-        targets_tn = torch.cat([gt_tt, gt_tp, gt_np], dim=1) * 1.0
-        c_loss_tn = F.cross_entropy(outputs[:, [1, 2, 3]], targets_tn)
+        _gt_np = gt_np & (~gt_tt) & (~gt_tp)
+        _pr_np = pr_np - (pr_tp + pr_tt) / 2
+        _outputs = torch.cat([pr_tt, pr_tp, _pr_np], dim=1)
+        _targets=  torch.cat([gt_tt, gt_tp, _gt_np], dim=1) * 1.0
+        c_loss_tn = F.cross_entropy(_outputs, _targets)
 
         loss = loss + c_loss_t + c_loss_n + c_loss_tn
         return loss
