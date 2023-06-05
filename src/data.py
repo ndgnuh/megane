@@ -47,6 +47,13 @@ class Sample:
         image = self.visualize(*a, **k)
         return to_tensor(image)
 
+    def adapt_metrics(self):
+        import numpy as np
+
+        boxes = np.array(self.boxes)
+        classes = np.array(self.classes)
+        return boxes, classes
+
 
 def load_sample_labelme(sample_path, classes):
     """Load a labelme json and convert it to an instance of Sample

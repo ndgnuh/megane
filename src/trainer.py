@@ -9,7 +9,6 @@ from torchvision.transforms import functional as TF
 from tqdm import tqdm
 from lightning import Fabric
 from tensorboardX import SummaryWriter
-from torchmetrics.detection import MeanAveragePrecision
 
 from .models import Model
 from .data import TextDetectionDataset
