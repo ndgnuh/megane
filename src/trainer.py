@@ -54,7 +54,7 @@ class Trainer:
         logdir = "log/expm-" + datetime.now().isoformat()
         total_steps = 1000000
         print_every = 100
-        validate_every = 5
+        validate_every = 200
         self.latest_model_path = "latest.pt"
 
         #
@@ -72,13 +72,13 @@ class Trainer:
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         # Dataloader
-        def make_loader(data):
+        def make_loader(data, **kwargs):
             data = TextDetectionDataset(
                 data, classes, transform=self.model.encode_sample
             )
-            return DataLoader(data, **dataloader_config)
+            return DataLoader(data, **dataloader_config, **kwargs)
 
-        self.train_loader = make_loader(train_data)
+        self.train_loader = make_loader(train_data, shuffle=True)
         self.val_loader = make_loader(val_data)
 
         # Scheduling
@@ -155,6 +155,7 @@ class Trainer:
             # Loss
             loss = model.compute_loss(outputs, targets).item()
             losses.append(loss)
+            pbar.set_postfix({"loss": loss})
 
             # Inference output
             for _inputs, _outputs, _targets in zip(images, outputs, targets):
@@ -167,6 +168,7 @@ class Trainer:
                     *gt_sample.adapt_metrics()
                 )
                 maf1_set.append(maf1)
+
 
         # Logging
         # Visualize
@@ -181,6 +183,7 @@ class Trainer:
         # Validation loss
         loss = np.mean(losses)
         logger.add_scalar("validate/loss", loss, step)
+        logger.flush()
 
 
 def _gen_image_preview(outputs: Tensor):
