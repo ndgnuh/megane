@@ -136,6 +136,7 @@ def expand(boxes: np.ndarray, r: float = 1.5):
     )
     return new_boxes
 
+
 def shrink_expand(boxes: np.ndarray, r: float = 0.4):
     """Shrink and expand bounding boxes using the shrink formular from DBNet.
 
@@ -159,3 +160,55 @@ def shrink_expand(boxes: np.ndarray, r: float = 0.4):
         [boxes[:, 0] - d, boxes[:, 1] - d, boxes[:, 2] + d, boxes[:, 3] + d], axis=1
     )
     return shrinked, expanded
+
+
+def mask_to_box(mask, min_score=0.5):
+    """Convert a score mask to bounding boxes using connected component.
+
+    Args:
+        mask:
+            A numpy array score mask of shape [H, W], type float32.
+        min_score:
+            Min score filter, boxes with lower score would be filtered out.
+            Default: 0.5
+
+    Returns:
+        boxes:
+            A numpy float32 array of shape [L, 4], each row is a box of xyxy format.
+            The boxes are normalized to 0..1 value range.
+        scores:
+            A numpy vector of length [L] that contains box scores.
+            Each score is in 0..1 range.
+    """
+    # mask is float32
+    mask = np.tanh(mask)
+    imask = np.clip(mask, 0, 1) * 255
+    imask = imask.round().astype("uint8")
+
+    # Find boxes
+    stats = cv2.connectedComponentsWithStats(imask)
+    boxes = stats[2][1:, :4].copy()
+
+    # Convert from xywh to xyxy
+    boxes[:, 2] = boxes[:, 0] + boxes[:, 2]
+    boxes[:, 3] = boxes[:, 1] + boxes[:, 3]
+
+    # Calculate scores
+    scores = np.zeros(boxes.shape[0])
+    for i, (x1, y1, x2, y2) in enumerate(boxes):
+        scores[i] = np.clip(mask[y1:y2, x1:x2].mean(), 0, 1)
+
+    # Expand boxes
+    boxes = utils.expand(boxes, 1.5)
+    boxes = boxes.round().astype(int)
+
+    # Normalize
+    h, w = mask.shape
+    normalizer = np.array([w, h, w, h]).reshape(1, 4)
+    boxes = boxes / normalizer
+
+    # Filter low score boxes
+    keep = scores >= min_score
+    boxes = boxes[keep, :]
+    scores = scores[keep]
+    return boxes, scores
