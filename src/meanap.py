@@ -52,7 +52,9 @@ def compute_iou(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
     return iou
 
 
-def compute_confusion(pr_boxes: np.ndarray, gt_boxes: np.ndarray, iou_threshold=0.5) -> Tuple[int, int, int]:
+def compute_confusion(
+    pr_boxes: np.ndarray, gt_boxes: np.ndarray, iou_threshold=0.5
+) -> Tuple[int, int, int]:
     """Compute confusion matrix, except for true negative
 
     Args:
@@ -92,7 +94,6 @@ def compute_confusion(pr_boxes: np.ndarray, gt_boxes: np.ndarray, iou_threshold=
     ious = compute_iou(pr_boxes, gt_boxes)
     pr_idx, gt_idx = np.where(ious >= iou_threshold)
     match_scores = ious[pr_idx, gt_idx]
-    print(match_scores)
 
     # No matches
     if match_scores.shape[0] == 0:
@@ -119,3 +120,145 @@ def compute_confusion(pr_boxes: np.ndarray, gt_boxes: np.ndarray, iou_threshold=
     fp = num_pr - len(pr_match_idx)
     fn = num_gt - tp
     return tp, fp, fn
+
+
+def compute_ap(
+    pr_boxes: np.ndarray,
+    pr_classes: np.ndarray,
+    gt_boxes: np.ndarray,
+    gt_classes: np.ndarray,
+) -> np.ndarray:
+    """Compute average precision of each classes.
+    Boxes has [L, 4] shape, in xyxy format.
+    Classes assignment has [L] shape.
+
+    Args:
+        pr_boxes:
+            Prediction bounding boxes
+        pr_classes:
+            Prediction class assignment
+        gt_boxes:
+            Ground truth bounding boxes
+        gt_classes:
+            Ground truth class assignment
+
+    Returns:
+        AP numpy array of shape [C].
+    """
+    thresholds = np.linspace(0.0, 1.0, 10)
+    num_threshold = len(thresholds)
+    aps = []
+
+    # Compute AP of each class
+    for cls in np.unique(gt_classes):
+        pr_mask = pr_classes == cls
+        gt_mask = gt_classes == cls
+
+        prs = []
+        rcs = []
+        for t in thresholds:
+            tp, fp, fn = compute_confusion(
+                pr_boxes[pr_mask], gt_boxes[gt_mask], iou_threshold=t
+            )
+            prs.append(tp / (tp + fp + 1e-6))
+            rcs.append(tp / (tp + fn + 1e-6))
+        ap = sum((rcs[i + 1] - rcs[i]) * prs[i + 1] for i in range(num_threshold - 1))
+        aps.append(ap)
+
+    return np.array(aps)
+
+
+def compute_af1(
+    pr_boxes: np.ndarray,
+    pr_classes: np.ndarray,
+    gt_boxes: np.ndarray,
+    gt_classes: np.ndarray,
+) -> np.ndarray:
+    """Compute average F1 score of each class.
+    Boxes has [L, 4] shape, in xyxy format.
+    Classes assignment has [L] shape.
+
+    Args:
+        pr_boxes:
+            Prediction bounding boxes
+        pr_classes:
+            Prediction class assignment
+        gt_boxes:
+            Ground truth bounding boxes
+        gt_classes:
+            Ground truth class assignment
+
+    Returns:
+        F1 numpy array of shape [C].
+    """
+    thresholds = np.linspace(0.0, 1.0, 10)
+    num_threshold = len(thresholds)
+    af1s = []
+
+    # Compute AP of each class
+    for cls in np.unique(gt_classes):
+        pr_mask = pr_classes == cls
+        gt_mask = gt_classes == cls
+
+        f1s = []
+        for t in thresholds:
+            tp, fp, fn = compute_confusion(
+                pr_boxes[pr_mask], gt_boxes[gt_mask], iou_threshold=t
+            )
+            f1 = 2 * tp / (2 * tp + fp + fn + 1e-6)
+            f1s.append(f1)
+        af1s.append(np.mean(f1s))
+
+    return np.array(af1s)
+
+
+def compute_map(
+    pr_boxes: np.ndarray,
+    pr_classes: np.ndarray,
+    gt_boxes: np.ndarray,
+    gt_classes: np.ndarray,
+) -> float:
+    """Compute average meanAP score.
+    Boxes has [L, 4] shape, in xyxy format.
+    Classes assignment has [L] shape.
+
+    Args:
+        pr_boxes:
+            Prediction bounding boxes
+        pr_classes:
+            Prediction class assignment
+        gt_boxes:
+            Ground truth bounding boxes
+        gt_classes:
+            Ground truth class assignment
+
+    Returns:
+        Mean AP score.
+    """
+    return compute_ap(pr_boxes, pr_classes, gt_boxes, gt_classes).mean()
+
+
+def compute_maf1(
+    pr_boxes: np.ndarray,
+    pr_classes: np.ndarray,
+    gt_boxes: np.ndarray,
+    gt_classes: np.ndarray,
+) -> float:
+    """Compute mean of average F1 score over classes.
+    Boxes has [L, 4] shape, in xyxy format.
+    Classes assignment has [L] shape.
+
+    Args:
+        pr_boxes:
+            Prediction bounding boxes
+        pr_classes:
+            Prediction class assignment
+        gt_boxes:
+            Ground truth bounding boxes
+        gt_classes:
+            Ground truth class assignment
+
+    Returns:
+        Mean average F1 score.
+    """
+    return compute_af1(pr_boxes, pr_classes, gt_boxes, gt_classes).mean()
