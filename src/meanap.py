@@ -1,16 +1,20 @@
+from typing import Tuple
 import numpy as np
+
+
 def torch_iou(b1, b2):
     """Wrapper for torchvision.ops.box_iou, receives and returns numpy array.
     This function is only used for testing
     """
     from torchvision import ops
     import torch
+
     b1 = torch.tensor(b1)
     b2 = torch.tensor(b2)
     return ops.box_iou(b1, b2).numpy()
 
 
-def compute_iou(boxes1, boxes2):
+def compute_iou(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
     """Compute IOU between two set of boxes.
     Input boxes must be in [x1, y1, x2, y2] format.
 
@@ -46,3 +50,72 @@ def compute_iou(boxes1, boxes2):
     # IOU
     iou = intersection / union
     return iou
+
+
+def compute_confusion(pr_boxes: np.ndarray, gt_boxes: np.ndarray, iou_threshold=0.5) -> Tuple[int, int, int]:
+    """Compute confusion matrix, except for true negative
+
+    Args:
+        pr_boxes:
+            Prediction bounding boxes.
+            Shape: [L1, 4]
+            Format: x1, y1, x2, y2
+        gt_boxes:
+            Ground truth bounding boxes.
+            Shape: [L2, 4]
+            Format: x1, y1, x2, y2
+        iou_threshold:
+            IoU score to be considered positive.
+
+    Returns:
+        tp:
+            number of true positives
+        fp:
+            number of false positives
+        fn:
+            number of false negatives
+    """
+    num_pr = pr_boxes.shape[0]
+    num_gt = gt_boxes.shape[0]
+
+    # Corner cases
+    if num_pr == 0:
+        tp = fp = tn = 0
+        fn = num_gt
+        return tp, fp, fn
+    if num_gt == 0:
+        tp = fn = tn = 0
+        fp = num_pr
+        return tp, fp, fn
+
+    # Find matches
+    ious = compute_iou(pr_boxes, gt_boxes)
+    pr_idx, gt_idx = np.where(ious >= iou_threshold)
+    match_scores = ious[pr_idx, gt_idx]
+    print(match_scores)
+
+    # No matches
+    if match_scores.shape[0] == 0:
+        tp = 0
+        fp = num_pr
+        fn = num_gt
+        return tp, fp, fn
+
+    # suppress matches
+    args_desc = np.argsort(match_scores)[::-1]
+    gt_match_idx = []
+    pr_match_idx = []
+    pr_unmatched = {}
+    gt_unmatched = {}
+    for idx in args_desc:
+        _gt_idx = pr_idx[idx]
+        _pr_idx = gt_idx[idx]
+        if pr_unmatched.get(_pr_idx, True) and gt_unmatched.get(_gt_idx, True):
+            pr_match_idx.append(_pr_idx)
+            pr_unmatched[_pr_idx] = False
+            gt_match_idx.append(_gt_idx)
+            gt_unmatched[_gt_idx] = False
+    tp = len(gt_match_idx)
+    fp = num_pr - len(pr_match_idx)
+    fn = num_gt - tp
+    return tp, fp, fn
