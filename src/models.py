@@ -1,11 +1,13 @@
 from typing import *
 
 import torch
+import numpy as np
 from torch.nn import functional as F
 from torch import nn, Tensor, no_grad
 from torchvision.models import mobilenet_v3_small, mobilenet_v3_large
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.ops import FeaturePyramidNetwork
+from torchvision.transforms import functional as TF
 
 from .data import Sample
 from . import utils
@@ -191,6 +193,44 @@ class BgThreshTextNoise(nn.Module):
 
         return image, masks
 
+    def decode_sample(self, inputs, outputs, sample: Optional[Sample] = None) -> Sample:
+        """Return a sample from raw model outputs
+        Args:
+            inputs:
+                Model encoded input image.
+            outputs:
+                Model raw outputs.
+            sample:
+                The input sample, this is only used to get the image.
+
+        Returns:
+            The decoded sample.
+        """
+        inputs = inputs.detach().cpu()
+        outputs = outputs.detach().cpu()
+        if sample is None:
+            image = TF.to_pil_image(inputs)
+            h, w = inputs.shape[-2:]
+        else:
+            image = sample.image
+            w, h = image.size
+        single_channel = (outputs.shape[0] == 1)
+        if single_channel:
+            text_mask = outputs[0]
+        else:
+            text_mask = outputs[2]
+
+        text_mask = text_mask.numpy()
+        boxes, scores = utils.mask_to_box(text_mask, min_score=0.5)
+        boxes = utils.expand(boxes, 1.5)
+        normalizer = np.array([w, h, w, h]).reshape(1, 4)
+        boxes = (boxes * normalizer).round().astype(int)
+        from tqdm import tqdm
+        return Sample(image=image,
+                      boxes=boxes,
+                      classes=np.zeros_like(scores).astype(int).tolist(),
+                      scores=scores.tolist())
+
     def compute_loss(self, outputs, targets):
         # Unpack GT and PR
         # text threshold, text probs, noise probs
@@ -247,6 +287,7 @@ class Model(nn.Module):
         # self.head = PredictionHead(hidden_size, num_classes, num_special_classes)
         self.head = BgThreshTextNoise(self.hidden_size, self.image_size)
         self.encode_sample = self.head.encode_sample
+        self.decode_sample = self.head.decode_sample
         self.compute_loss = self.head.compute_loss
 
     def _mk_backbone(self):

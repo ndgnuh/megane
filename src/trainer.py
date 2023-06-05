@@ -53,7 +53,7 @@ class Trainer:
         logdir = "log/expm-" + datetime.now().isoformat()
         total_steps = 1000000
         print_every = 100
-        validate_every = 250
+        validate_every = 5
         self.latest_model_path = "latest.pt"
 
         #
@@ -67,6 +67,7 @@ class Trainer:
                 "num_classes": len(classes),
             }
         )
+        self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         # Dataloader
@@ -116,7 +117,9 @@ class Trainer:
             pbar.set_postfix({"loss": loss})
 
             if step % print_every == 0:
-                logger.add_image("train/sample", _gen_image_preview(outputs), step)
+                b_idx =  random.choice(range(images.shape[0]))
+                sample = model.decode_sample(images[b_idx], outputs[b_idx])
+                logger.add_image("train/sample", sample.visualize_tensor(), step)
                 # logger.add_images(image)
                 logger.flush()
 
@@ -151,8 +154,9 @@ class Trainer:
             pbar.set_postfix({"loss": loss})
             losses.append(loss)
             if idx == v_index:
-                image = _gen_image_preview(outputs)
-                logger.add_image("validate/sample", image, step)
+                b_idx =  random.choice(range(images.shape[0]))
+                sample = model.decode_sample(images[b_idx], outputs[b_idx])
+                logger.add_image("validate/sample", sample.visualize_tensor(), step)
 
         # Logging
         loss = np.mean(losses)

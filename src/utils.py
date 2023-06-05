@@ -1,7 +1,9 @@
 from io import BytesIO
 from typing import Tuple
 
+import cv2
 import numpy as np
+from scipy.special import logit
 from PIL import Image
 
 
@@ -181,8 +183,8 @@ def mask_to_box(mask, min_score=0.5):
             Each score is in 0..1 range.
     """
     # mask is float32
-    mask = np.tanh(mask)
-    imask = np.clip(mask, 0, 1) * 255
+    imask = np.tanh(mask)
+    imask = np.clip(imask, 0, 1) * 255
     imask = imask.round().astype("uint8")
 
     # Find boxes
@@ -195,11 +197,13 @@ def mask_to_box(mask, min_score=0.5):
 
     # Calculate scores
     scores = np.zeros(boxes.shape[0])
+    M = mask.max()
+    m = mask.min()
+    score_mask = (mask - m) / (M - m)
     for i, (x1, y1, x2, y2) in enumerate(boxes):
-        scores[i] = np.clip(mask[y1:y2, x1:x2].mean(), 0, 1)
+        scores[i] = np.clip(score_mask[y1:y2, x1:x2].mean(), 0, 1)
 
     # Expand boxes
-    boxes = utils.expand(boxes, 1.5)
     boxes = boxes.round().astype(int)
 
     # Normalize

@@ -6,11 +6,12 @@ from typing import List, Tuple, Optional, Callable
 from os import path
 from dataclasses import dataclass
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from torch.utils.data import Dataset, DataLoader
 
 
 from . import utils
+
 
 @dataclass
 class Sample:
@@ -24,10 +25,27 @@ class Sample:
             has values normalized to (0, 1).
         classes:
             List of classes associated with each bounding boxes
+        scores:
+            Class scores (if available).
     """
+
     image: Image
-    boxes: List[Tuple[int, int, int ,int]]
+    boxes: List[Tuple[int, int, int, int]]
     classes: List[int]
+    scores: Optional[List[float]] = None
+
+    def visualize(self, outline=(255, 0, 0)) -> Image:
+        image = self.image.copy()
+        draw = ImageDraw.Draw(image)
+        for x1, y1, x2, y2 in self.boxes:
+            draw.rectangle([(x1, y1), (x2, y2)], outline=outline)
+        return image
+
+    def visualize_tensor(self, *a, **k):
+        from torchvision.transforms.functional import to_tensor
+
+        image = self.visualize(*a, **k)
+        return to_tensor(image)
 
 
 def load_sample_labelme(sample_path, classes):
@@ -57,12 +75,7 @@ def load_sample_labelme(sample_path, classes):
     for shape in shapes:
         if shape["shape_type"] == "rectangle":
             [x1, y1], [x2, y2] = shape["points"]
-            boxes.append([
-                x1 / width,
-                y1 / height,
-                x2 / width,
-                y2 / height
-            ])
+            boxes.append([x1 / width, y1 / height, x2 / width, y2 / height])
         elif shape["shape_type"] == "polygon":
             xs = [x / width for (x, y) in shape["points"]]
             ys = [y / height for (x, y) in shape["points"]]
@@ -80,11 +93,7 @@ def load_sample_labelme(sample_path, classes):
     else:
         image_path = path.join(path.dirname(file), image_path)
         image = Image.open(image_path)
-    return Sample(
-        image = image,
-        boxes = boxes,
-        classes = class_indices
-    )
+    return Sample(image=image, boxes=boxes, classes=class_indices)
 
 
 class TextDetectionDataset(Dataset):
@@ -102,16 +111,21 @@ class TextDetectionDataset(Dataset):
             Should the sample loading be cached?
             The transformation is still applied everytime.
     """
-    def __init__(self,
-                 index: str,
-                 classes: List[str],
-                 transform: Optional[Callable] = None,
-                 cache: Optional[bool] = True):
+
+    def __init__(
+        self,
+        index: str,
+        classes: List[str],
+        transform: Optional[Callable] = None,
+        cache: Optional[bool] = True,
+    ):
         super().__init__()
         root_dir = path.dirname(index)
-        with open(index, 'r') as fp:
+        with open(index, "r") as fp:
             sample_paths = [line.strip("\n") for line in fp.readlines()]
-            sample_paths = [path.join(root_dir, sample_path) for sample_path in sample_paths]
+            sample_paths = [
+                path.join(root_dir, sample_path) for sample_path in sample_paths
+            ]
         for sample_path in sample_paths:
             assert path.isfile(sample_path), f"{sample_path} does not exists"
         if cache:
