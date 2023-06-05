@@ -197,9 +197,12 @@ class BgThreshTextNoise(nn.Module):
         """Return a sample from raw model outputs
         Args:
             inputs:
-                Model encoded input image.
+                Model encoded input image of shape [3, H, W]
             outputs:
-                Model raw outputs.
+                Model raw outputs of shape [C, H, W].
+                If C = 1, the first channel will be used.
+                If C = 4, the third channel will be used.
+                If C = 3 (ground truth), the second channel will be used.
             sample:
                 The input sample, this is only used to get the image.
 
@@ -214,11 +217,15 @@ class BgThreshTextNoise(nn.Module):
         else:
             image = sample.image
             w, h = image.size
-        single_channel = (outputs.shape[0] == 1)
-        if single_channel:
+        C = outputs.shape[0]
+        if C == 1:
             text_mask = outputs[0]
-        else:
+        elif C == 4:
             text_mask = outputs[2]
+        elif C == 3:
+            text_mask = outputs[1]
+        else:
+            raise RuntimeError("Unknown outputs format")
 
         text_mask = text_mask.numpy()
         boxes, scores = utils.mask_to_box(text_mask, min_score=0.5)
