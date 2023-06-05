@@ -208,14 +208,14 @@ class BgThreshTextNoise(nn.Module):
         # Loss for bg, text and text threshold
         gt_bg = torch.ones_like(gt_tt)
         gt_bg = gt_bg & (~gt_tt) & (~gt_tp)
-        _outputs = torch.cat([pr_bg, pr_tt, pr_tp], dim=1)
+        _outputs = torch.cat([pr_bg.detach(), pr_tt, pr_tp], dim=1)
         _targets=  torch.cat([gt_bg, gt_tt, gt_tp], dim=1) * 1.0
         c_loss_t = F.cross_entropy(_outputs, _targets)
 
         # Loss for bg and noise
         gt_bg = torch.ones_like(gt_tt)
         gt_bg = gt_bg & (~gt_np)
-        _outputs = torch.cat([pr_bg, pr_np], dim=1)
+        _outputs = torch.cat([pr_bg.detach(), pr_np], dim=1)
         _targets=  torch.cat([gt_bg, gt_np], dim=1) * 1.0
         c_loss_n = F.cross_entropy(_outputs, _targets)
 
