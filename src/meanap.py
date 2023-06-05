@@ -48,7 +48,7 @@ def compute_iou(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
     union = (union > 0) * union
 
     # IOU
-    iou = intersection / union
+    iou = intersection / (union + 1e-6)
     return iou
 
 
@@ -207,7 +207,9 @@ def compute_af1(
             )
             f1 = 2 * tp / (2 * tp + fp + fn + 1e-6)
             f1s.append(f1)
-        af1s.append(np.mean(f1s))
+
+        af1 = np.nan_to_num(np.mean(f1s), nan=0)
+        af1s.append(af1)
 
     return np.array(af1s)
 
@@ -261,4 +263,6 @@ def compute_maf1(
     Returns:
         Mean average F1 score.
     """
-    return compute_af1(pr_boxes, pr_classes, gt_boxes, gt_classes).mean()
+    maf1 = compute_af1(pr_boxes, pr_classes, gt_boxes, gt_classes).mean()
+    maf1 = np.nan_to_num(maf1, nan=0)
+    return maf1

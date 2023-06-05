@@ -9,9 +9,11 @@ from torchvision.transforms import functional as TF
 from tqdm import tqdm
 from lightning import Fabric
 from tensorboardX import SummaryWriter
+from torchmetrics.detection import MeanAveragePrecision
 
 from .models import Model
 from .data import TextDetectionDataset
+from .meanap import compute_maf1
 
 
 def loop_loader(loader, total_steps: int):
@@ -140,25 +142,44 @@ class Trainer:
 
         # Stats
         losses = []
+        maf1_set = []
+        predictions = []
+        ground_truths = []
 
         # Visualize index
         v_index = random.randint(0, num_batches - 1)
-
         pbar = tqdm(dataloader, "Validating")
         for idx, (images, targets) in enumerate(pbar):
             # Step
             outputs = model(images)
-            loss = model.compute_loss(outputs, targets).item()
 
-            # Logging
-            pbar.set_postfix({"loss": loss})
+            # Loss
+            loss = model.compute_loss(outputs, targets).item()
             losses.append(loss)
-            if idx == v_index:
-                b_idx =  random.choice(range(images.shape[0]))
-                sample = model.decode_sample(images[b_idx], outputs[b_idx])
-                logger.add_image("validate/sample", sample.visualize_tensor(), step)
+
+            # Inference output
+            for _inputs, _outputs, _targets in zip(images, outputs, targets):
+                pr_sample = model.decode_sample(_inputs, _outputs)
+                gt_sample = model.decode_sample(_inputs, _targets * 1.0)
+                predictions.append(pr_sample)
+                ground_truths.append(gt_sample)
+                maf1 = compute_maf1(
+                    *pr_sample.adapt_metrics(),
+                    *gt_sample.adapt_metrics()
+                )
+                maf1_set.append(maf1)
 
         # Logging
+        # Visualize
+        n = len(predictions)
+        idx = random.randint(0, n - 1)
+        logger.add_image("validate/sample-pr", predictions[idx].visualize_tensor(), step)
+        logger.add_image("validate/sample-gt", ground_truths[idx].visualize_tensor(), step)
+
+        # Metric
+        logger.add_scalar(f"validate/mean-average-F1", np.mean(maf1_set), step)
+
+        # Validation loss
         loss = np.mean(losses)
         logger.add_scalar("validate/loss", loss, step)
 

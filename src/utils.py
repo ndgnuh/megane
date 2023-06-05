@@ -3,7 +3,6 @@ from typing import Tuple
 
 import cv2
 import numpy as np
-from scipy.special import logit
 from PIL import Image
 
 
@@ -199,7 +198,7 @@ def mask_to_box(mask, min_score=0.5):
     scores = np.zeros(boxes.shape[0])
     M = mask.max()
     m = mask.min()
-    score_mask = (mask - m) / (M - m)
+    score_mask = (mask - m) / (M - m + 1e-6)
     for i, (x1, y1, x2, y2) in enumerate(boxes):
         scores[i] = np.clip(score_mask[y1:y2, x1:x2].mean(), 0, 1)
 
