@@ -54,7 +54,8 @@ class Trainer:
         lr = train_config.lr
         logdir = f"logs/{model_config.name}-{datetime.now().isoformat()}"
 
-        self.latest_model_path = "latest.pt"
+        self.best_weight_path = f"{weight_dir}/{model_config.best_weight_name}"
+        self.latest_weight_path = f"{weight_dir}/{model_config.latest_weight_name}"
 
         # Torch fabric
         self.fabric = Fabric(**fabric_config)
@@ -124,9 +125,11 @@ class Trainer:
             if step % validate_every == 0:
                 self.validate(step)
                 logger.flush()
+                self.save_weight(self.latest_weight_path)
 
-                torch.save(model.state_dict(), "model.pt")
-                torch.save(outputs.cpu().detach(), "sample-output.pt")
+    def save_weight(self, path):
+        tqdm.write(f"Model weight saved to {path}")
+        torch.save(self.model.state_dict(), path)
 
     @torch.no_grad()
     def validate(self, step=0):

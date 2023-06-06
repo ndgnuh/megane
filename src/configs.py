@@ -93,8 +93,8 @@ class ModelConfig(BaseModel):
 
     @property
     def latest_weight_name(self):
-        return f"{self.name}.latest.pth"
+        return f"{self.name}.latest.pt"
 
     @property
     def best_weight_name(self):
-        return f"{self.name}.best.pth"
+        return f"{self.name}.best.pt"
