@@ -29,8 +29,27 @@ class Model(nn.Module):
         self.encode_sample = self.head.encode_sample
         self.decode_sample = self.head.decode_sample
         self.compute_loss = self.head.compute_loss
+        self.set_infer(False)
 
     def forward(self, images: Tensor):
         features = self.backbone(images)
         outputs = self.head(features)
         return outputs
+
+    def set_infer(self, infer: bool):
+        """
+        Set inference mode.
+        This is different from eval() in that eval() can be used when validating
+        but this cannot.
+
+        Inference mode remove some of the auxiliary channels of the model.
+        Setting infer to True also calls `eval()`, while setting it to False call `train()`.
+        """
+        self.infer = infer
+        if infer:
+            self.eval()
+        else:
+            self.train()
+        for module in self.modules():
+            assert not hasattr(module, "infer") or isinstance(getattr(module, "infer"), bool)
+            module.infer = infer
