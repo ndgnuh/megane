@@ -1,4 +1,5 @@
 import random
+from os import path, makedirs
 from datetime import datetime
 
 import torch
@@ -73,7 +74,7 @@ class Trainer:
         # Dataloader
         def make_loader(data, **kwargs):
             data = TextDetectionDataset(
-                data, classes, transform=self.model.encode_sample
+                data, model_config.classes, transform=self.model.encode_sample
             )
             return DataLoader(data, **dataloader_config, **kwargs)
 
@@ -128,9 +129,11 @@ class Trainer:
                 logger.flush()
                 self.save_weight(self.latest_weight_path)
 
-    def save_weight(self, path):
-        tqdm.write(f"Model weight saved to {path}")
-        torch.save(self.model.state_dict(), path)
+    def save_weight(self, savepath):
+        dirname = path.dirname(savepath)
+        makedirs(dirname, exist_ok=True)
+        tqdm.write(f"Model weight saved to {savepath}")
+        torch.save(self.model.state_dict(), savepath)
 
     @torch.no_grad()
     def validate(self, step=0):

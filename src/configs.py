@@ -87,10 +87,17 @@ class ModelConfig(BaseModel):
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
 
+    # Properties that must be provided by the model head configs
+    @property
+    def classes(self):
+        return self.head.classes
+
+    # Properties that must be provided by the model backbone configs
     @property
     def hidden_size(self):
         return self.backbone.hidden_size
 
+    # Stuffs for trainer
     @property
     def latest_weight_name(self):
         return f"{self.name}.latest.pt"
