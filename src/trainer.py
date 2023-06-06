@@ -13,6 +13,7 @@ from tensorboardX import SummaryWriter
 from .models import Model
 from .data import TextDetectionDataset
 from .meanap import compute_maf1
+from .configs import TrainConfig
 
 
 def loop_loader(loader, total_steps: int):
@@ -42,23 +43,25 @@ def loop_loader(loader, total_steps: int):
 
 
 class Trainer:
-    def __init__(self):
+    def __init__(self, train_config: TrainConfig):
+        train_data = train_config.train_data
+        val_data = train_config.val_data
+        dataloader_config = train_config.dataloader
+        fabric_config = train_config.fabric
+        total_steps = train_config.total_steps
+        print_every = train_config.print_every
+        validate_every = train_config.validate_every
+        lr = train_config.lr
+
         image_size = 864
         assert image_size % 32 == 0
-        train_data = "data/train.txt"
-        val_data = "data/val.txt"
         classes = ["text", "noise"]
-        dataloader_config = {"batch_size": 2}
         hidden_size = 256
-        lr = 1e-4
         logdir = "log/expm-" + datetime.now().isoformat()
-        total_steps = 1000000
-        print_every = 100
-        validate_every = 200
         self.latest_model_path = "latest.pt"
 
-        #
-        self.fabric = Fabric(accelerator="auto")
+        # Torch fabric
+        self.fabric = Fabric(**fabric_config)
 
         # Model & optimization
         self.model = Model(
