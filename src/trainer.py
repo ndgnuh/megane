@@ -54,6 +54,7 @@ class Trainer:
         lr = train_config.lr
         logdir = f"logs/{model_config.name}-{datetime.now().isoformat()}"
 
+        weight_dir = "weights"
         self.best_weight_path = f"{weight_dir}/{model_config.best_weight_name}"
         self.latest_weight_path = f"{weight_dir}/{model_config.latest_weight_name}"
 
