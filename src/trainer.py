@@ -13,7 +13,7 @@ from tensorboardX import SummaryWriter
 from .models import Model
 from .data import TextDetectionDataset
 from .meanap import compute_maf1
-from .configs import TrainConfig
+from .configs import TrainConfig, ModelConfig
 
 
 def loop_loader(loader, total_steps: int):
@@ -43,7 +43,7 @@ def loop_loader(loader, total_steps: int):
 
 
 class Trainer:
-    def __init__(self, train_config: TrainConfig):
+    def __init__(self, train_config: TrainConfig, model_config: ModelConfig):
         train_data = train_config.train_data
         val_data = train_config.val_data
         dataloader_config = train_config.dataloader
@@ -52,26 +52,20 @@ class Trainer:
         print_every = train_config.print_every
         validate_every = train_config.validate_every
         lr = train_config.lr
+        logdir = f"logs/{model_config.name}-{datetime.now().isoformat()}"
 
-        image_size = 864
-        assert image_size % 32 == 0
-        classes = ["text", "noise"]
-        hidden_size = 256
-        logdir = "log/expm-" + datetime.now().isoformat()
         self.latest_model_path = "latest.pt"
 
         # Torch fabric
         self.fabric = Fabric(**fabric_config)
 
         # Model & optimization
-        self.model = Model(
-            {
-                "image_size": image_size,
-                "hidden_size": hidden_size,
-                "num_classes": len(classes),
-            }
-        )
-        self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
+        self.model = Model(model_config)
+        if model_config.continue_weight:
+            self.model.load_state_dict(
+                torch.load(model_config.continue_weight, map_location="cpu")
+            )
+        # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         # Dataloader
@@ -121,7 +115,7 @@ class Trainer:
             pbar.set_postfix({"loss": loss})
 
             if step % print_every == 0:
-                b_idx =  random.choice(range(images.shape[0]))
+                b_idx = random.choice(range(images.shape[0]))
                 sample = model.decode_sample(images[b_idx], outputs[b_idx])
                 logger.add_image("train/sample", sample.visualize_tensor(), step)
                 # logger.add_images(image)
@@ -167,18 +161,20 @@ class Trainer:
                 predictions.append(pr_sample)
                 ground_truths.append(gt_sample)
                 maf1 = compute_maf1(
-                    *pr_sample.adapt_metrics(),
-                    *gt_sample.adapt_metrics()
+                    *pr_sample.adapt_metrics(), *gt_sample.adapt_metrics()
                 )
                 maf1_set.append(maf1)
-
 
         # Logging
         # Visualize
         n = len(predictions)
         idx = random.randint(0, n - 1)
-        logger.add_image("validate/sample-pr", predictions[idx].visualize_tensor(), step)
-        logger.add_image("validate/sample-gt", ground_truths[idx].visualize_tensor(), step)
+        logger.add_image(
+            "validate/sample-pr", predictions[idx].visualize_tensor(), step
+        )
+        logger.add_image(
+            "validate/sample-gt", ground_truths[idx].visualize_tensor(), step
+        )
 
         # Metric
         logger.add_scalar(f"validate/mean-average-F1", np.mean(maf1_set), step)

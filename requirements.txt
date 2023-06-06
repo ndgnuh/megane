@@ -6,3 +6,4 @@ pylint
 pyclean
 gdown
 tensorboardX
+pydantic
