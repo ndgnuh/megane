@@ -11,9 +11,10 @@ from torchvision.transforms import functional as TF
 
 from ..data import Sample
 from .. import utils
-from ..configs import ModelConfig
+from ..configs import ModelConfig, FViTConfig, FPNConfig
 from .head_dbbn import DBBNHead
 from .backbone_fpn import FPNBackbone
+from .backbone_fvit import FViTBackbone
 
 
 class Model(nn.Module):
@@ -22,7 +23,12 @@ class Model(nn.Module):
         self.image_size = config.image_size
         self.hidden_size = config.hidden_size
 
-        self.backbone = FPNBackbone(config)
+        if isinstance(config.backbone, FViTConfig):
+            self.backbone = FViTBackbone(**config.backbone.dict())
+        elif isinstance(config.backbone, FPNConfig):
+            self.backbone = FPNBackbone(config)
+        else:
+            raise ValueError(f"Unsupported backbone {config.backbone}")
         self.head = DBBNHead(config)
 
         # Delegation

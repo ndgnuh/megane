@@ -73,16 +73,22 @@ class FPNConfig(BaseModel):
     feature_module: Optional[str] = None
 
 
-class ViTConfig(BaseModel):
+class FViTConfig(BaseModel):
     patch_size: int
-    hidden_size: int
+    num_blocks: List[int] = [3, 6, 3]
+    hidden_sizes: List[int] = [32, 64, 128, 96]
+    num_attention_heads: List[int] = [2, 4, 8]
+
+    @property
+    def hidden_size(self):
+        return self.hidden_sizes[-1]
 
 
 class ModelConfig(BaseModel):
     name: str
     image_size: int
     head: Union[HeadConfig]
-    backbone: Union[FPNConfig, ViTConfig]
+    backbone: Union[FPNConfig, FViTConfig]
 
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
