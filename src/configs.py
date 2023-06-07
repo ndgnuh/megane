@@ -74,6 +74,23 @@ class FPNConfig(BaseModel):
     hidden_size: int
     feature_module: Optional[str] = None
 
+    def get_output_size(self):
+        return self.hidden_size
+
+
+class PCViTConfig(BaseModel):
+    patch_size: int
+    hidden_size: int
+    output_size: int
+    latent_size: int
+    num_layers: int
+    num_latents: int
+    num_attention_heads: int
+    final_div_factor: int
+
+    def get_output_size(self):
+        return self.output_size
+
 
 class FViTConfig(BaseModel):
     patch_size: int
@@ -81,11 +98,8 @@ class FViTConfig(BaseModel):
     hidden_sizes: List[int] = [32, 64, 128, 96]
     num_attention_heads: List[int] = [4, 8, 16]
 
-    @property
-    def hidden_size(self):
-        last_hidden = self.hidden_sizes[-1]
-        last_hidden = last_hidden // (2**self.num_stages)
-        return last_hidden
+    def get_output_size(self):
+        return self.hidden_size
 
     @property
     def num_stages(self):
@@ -96,7 +110,7 @@ class ModelConfig(BaseModel):
     name: str
     image_size: int
     head: Union[HeadConfig]
-    backbone: Union[FPNConfig, FViTConfig]
+    backbone: Union[FPNConfig, FViTConfig, PCViTConfig]
 
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
@@ -109,7 +123,7 @@ class ModelConfig(BaseModel):
     # Properties that must be provided by the model backbone configs
     @property
     def hidden_size(self):
-        return self.backbone.hidden_size
+        return self.backbone.get_output_size()
 
     # Stuffs for trainer
     @property

@@ -109,10 +109,10 @@ class Block(nn.Module):
         self.norm_mlp = nn.InstanceNorm2d(hidden_size)
 
     def forward(self, images):
-        images = self.norm_attention(images)
-        images = self.attention(images) + images
-        images = self.norm_mlp(images)
-        images = self.mlp(images) + images
+        ctx = self.norm_attention(images)
+        images = self.attention(ctx) + images
+        ctx = self.norm_mlp(images)
+        images = self.mlp(ctx) + images
         return images
 
 
@@ -121,11 +121,11 @@ class Stage(nn.Module):
         super().__init__()
         blocks = [Block(hidden_size, num_heads) for _ in range(num_blocks)]
         self.blocks = nn.Sequential(*blocks)
-        self.downscale = nn.Conv2d(hidden_size, output_size, 1)
+        self.project = nn.Conv2d(hidden_size, output_size, 3, padding=1)
 
     def forward(self, images):
         images = self.blocks(images)
-        images = self.downscale(images)
+        images = self.project(images)
         return images
 
 

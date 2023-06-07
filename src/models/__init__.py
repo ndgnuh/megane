@@ -11,10 +11,11 @@ from torchvision.transforms import functional as TF
 
 from ..data import Sample
 from .. import utils
-from ..configs import ModelConfig, FViTConfig, FPNConfig
+from ..configs import ModelConfig, FViTConfig, FPNConfig, PCViTConfig
 from .head_dbbn import DBBNHead
 from .backbone_fpn import FPNBackbone
 from .backbone_fvit import FViTBackbone
+from .backbone_pcvit import PCViTBackbone
 
 
 class Model(nn.Module):
@@ -27,6 +28,8 @@ class Model(nn.Module):
             self.backbone = FViTBackbone(config)
         elif isinstance(config.backbone, FPNConfig):
             self.backbone = FPNBackbone(config)
+        elif isinstance(config.backbone, PCViTConfig):
+            self.backbone = PCViTBackbone(config)
         else:
             raise ValueError(f"Unsupported backbone {config.backbone}")
         self.head = DBBNHead(config)
