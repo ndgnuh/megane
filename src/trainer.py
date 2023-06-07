@@ -122,7 +122,13 @@ class Trainer:
                 b_idx = random.choice(range(images.shape[0]))
                 sample = model.decode_sample(images[b_idx], outputs[b_idx])
                 logger.add_image("train/sample", sample.visualize_tensor(), step)
-                # logger.add_images(image)
+                try:
+                    logger.add_image(
+                        "train/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
+                    )
+                except Exception:
+                    tqdm.write("Cannot visualize raw outputs")
+                    logger.add_text("train/outputs-pr-error", traceback.format_exc(), step)
                 logger.flush()
 
             if step % validate_every == 0:
@@ -202,23 +208,3 @@ class Trainer:
         logger.flush()
 
 
-def _gen_image_preview(outputs: Tensor):
-    """Create preview for logger
-
-    Args:
-        outputs:
-            Tensor of shape [B, C, H, W]
-
-    Returns:
-        image:
-            Tensor of shape [1, H, W]
-    """
-    # This actually gives much better results than sigmoid, softmax or thresholding
-    outputs = torch.clip(torch.tanh(outputs), 0, 1)
-    n = random.randint(0, outputs.shape[0] - 1)
-    images = [image for image in outputs[n]]
-    num_imgs = len(images)
-    image = torch.cat(images, dim=-1)
-    image = image.unsqueeze(0)
-    image = TF.resize(image, (640, 640 * num_imgs), antialias=False)
-    return image
