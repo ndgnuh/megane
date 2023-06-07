@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "megane"
+version = "0.2.1"
+dependencies = [
+    "numpy",
+    "torch",
+    "torchvision",
+    "lightning",
+    "pylint",
+    "pyclean",
+    "gdown",
+    "tensorboardX",
+    "pydantic",
+]
+description = "Text detection"
+
+[[project.authors]]
+name = "Hùng Nguyễn"
+email = "ndgnuh@protonmail.com"
+
+
+[tool.setuptools.package-dir]
+megane = "src"
+
+[project.urls]
+"Homepage" = "https://github.com/ndgnuh/megane"
+"Bug Tracker" = "https://github.com/ndgnuh/megane/issues"
