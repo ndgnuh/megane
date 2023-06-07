@@ -10,6 +10,7 @@ from torch import nn
 from .. import utils
 from ..data import Sample
 from ..configs import ModelConfig
+from .losses import ContourLoss
 
 
 def visualize_outputs(outputs: torch.Tensor):
@@ -92,6 +93,7 @@ class DBBNHead(nn.Module):
         )
         self.inferring = False
         self.visualize_outputs = visualize_outputs
+        self.contour_loss = ContourLoss(kernel_size=config.head.contour_loss_kernel)
 
     def forward(self, features, returns_all=False):
         if self.inferring:
@@ -199,7 +201,7 @@ class DBBNHead(nn.Module):
         gt_bg = torch.ones_like(gt_tt)
         gt_bg = gt_bg & (~(gt_tt | gt_tp | gt_np))
         _targets = torch.cat([gt_bg, gt_tt, gt_tp, gt_np], dim=1) * 1.0
-        loss = F.l1_loss(outputs, _targets)
+        loss = self.contour_loss(outputs, _targets)
         loss = F.mse_loss(outputs, _targets) + loss
         loss = loss / 2
 

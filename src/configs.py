@@ -60,6 +60,7 @@ class TrainConfig(BaseModel):
 
 class HeadConfig(BaseModel):
     classes: List[str]
+    contour_loss_kernel: int = 3
 
     @property
     def num_classes(self):

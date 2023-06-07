@@ -14,7 +14,7 @@ class Contour(nn.Module):
     """
     def __init__(self, kernel_size=3):
         super().__init__()
-        self.dilate = nn.MaxPool2d(kernel_size)
+        self.dilate = nn.MaxPool2d(kernel_size, stride=1)
         self.relu = nn.ReLU()
 
     def forward(self, images):
