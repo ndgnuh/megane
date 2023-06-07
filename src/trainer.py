@@ -89,6 +89,7 @@ class Trainer:
 
         # Logging
         self.logger = SummaryWriter(logdir=logdir)
+        self.logger.add_text("model", str(self.model), 0)
 
     def train(self):
         model, optimizer = self.fabric.setup(self.model, self.optimizer)
@@ -122,13 +123,12 @@ class Trainer:
                 b_idx = random.choice(range(images.shape[0]))
                 sample = model.decode_sample(images[b_idx], outputs[b_idx])
                 logger.add_image("train/sample", sample.visualize_tensor(), step)
-                try:
-                    logger.add_image(
-                        "train/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
-                    )
-                except Exception:
-                    tqdm.write("Cannot visualize raw outputs")
-                    logger.add_text("train/outputs-pr-error", traceback.format_exc(), step)
+                logger.add_image(
+                    "train/outputs-pr", model.head.visualize_outputs(outputs), step
+                )
+                logger.add_image(
+                    "train/outputs-gt", model.head.visualize_outputs(targets), step
+                )
                 logger.flush()
 
             if step % validate_every == 0:
@@ -191,13 +191,9 @@ class Trainer:
         logger.add_image(
             "validate/sample-gt", ground_truths[idx].visualize_tensor(), step
         )
-        try:
-            logger.add_image(
-                "validate/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
-            )
-        except Exception:
-            tqdm.write("Cannot visualize raw outputs")
-            logger.add_text("validate/outputs-pr-error", traceback.format_exc(), step)
+        logger.add_image(
+            "validate/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
+        )
 
         # Metric
         logger.add_scalar(f"validate/mean-average-F1", np.mean(maf1_set), step)
@@ -206,5 +202,3 @@ class Trainer:
         loss = np.mean(losses)
         logger.add_scalar("validate/loss", loss, step)
         logger.flush()
-
-
