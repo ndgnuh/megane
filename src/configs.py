@@ -77,11 +77,17 @@ class FViTConfig(BaseModel):
     patch_size: int
     num_blocks: List[int] = [3, 6, 3]
     hidden_sizes: List[int] = [32, 64, 128, 96]
-    num_attention_heads: List[int] = [2, 4, 8]
+    num_attention_heads: List[int] = [4, 8, 16]
 
     @property
     def hidden_size(self):
-        return self.hidden_sizes[-1]
+        last_hidden = self.hidden_sizes[-1]
+        last_hidden = last_hidden // (2**self.num_stages)
+        return last_hidden
+
+    @property
+    def num_stages(self):
+        return len(self.num_blocks)
 
 
 class ModelConfig(BaseModel):

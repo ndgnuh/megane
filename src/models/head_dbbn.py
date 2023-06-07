@@ -11,7 +11,8 @@ from .. import utils
 from ..data import Sample
 from ..configs import ModelConfig
 
-def visualize_outputs(outputs:  torch.Tensor):
+
+def visualize_outputs(outputs: torch.Tensor):
     """Create preview for logger
 
     Args:
@@ -86,7 +87,9 @@ class DBBNHead(nn.Module):
         self.hidden_size = config.hidden_size
 
         # Background and threshold
-        self.heads = nn.ModuleList([nn.Conv2d(self.hidden_size, 1, 1) for _ in range(4)])
+        self.heads = nn.ModuleList(
+            [nn.Conv2d(self.hidden_size, 1, 1) for _ in range(4)]
+        )
         self.inferring = False
         self.visualize_outputs = visualize_outputs
 

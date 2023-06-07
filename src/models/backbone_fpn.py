@@ -66,8 +66,11 @@ class UpscaleConcat(nn.Module):
         upscales = []
         for idx in range(num_upscales):
             channels = feature_size * (idx + 1)
-            conv = _conv_norm_act(
-                channels, channels, kernel_size=2, stride=2, Conv=nn.ConvTranspose2d
+            conv = nn.Sequential(
+                nn.UpsamplingNearest2d(scale_factor=2),
+                nn.Conv2d(channels, channels, 3, padding=1),
+                nn.InstanceNorm2d(channels),
+                nn.ReLU(),
             )
             upscales.append(conv)
         self.upscales = nn.ModuleList(upscales)

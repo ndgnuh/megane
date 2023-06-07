@@ -89,7 +89,7 @@ class Trainer:
 
         # Logging
         self.logger = SummaryWriter(logdir=logdir)
-        self.logger.add_text("model", str(self.model), 0)
+        self.log_text("model", str(self.model), 0)
 
     def train(self):
         model, optimizer = self.fabric.setup(self.model, self.optimizer)
@@ -111,7 +111,7 @@ class Trainer:
             outputs = model(images)
             loss = model.compute_loss(outputs, targets)
             fabric.backward(loss)
-            fabric.clip_gradients(model, optimizer, max_norm=5)
+            # fabric.clip_gradients(model, optimizer, max_norm=5)
             optimizer.step()
             loss = loss.item()
 
@@ -202,3 +202,6 @@ class Trainer:
         loss = np.mean(losses)
         logger.add_scalar("validate/loss", loss, step)
         logger.flush()
+
+    def log_text(self, tag, txt, step):
+        self.logger.add_text(tag, f"```\n{txt}\n```", step)
