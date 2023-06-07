@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from .polygon import polygon_area, polygon_perimeter, offset_polygon
+
 
 def bytes2pillow(bs: bytes) -> Image:
     """
