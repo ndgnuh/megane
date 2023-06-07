@@ -24,7 +24,7 @@ class Model(nn.Module):
         self.hidden_size = config.hidden_size
 
         if isinstance(config.backbone, FViTConfig):
-            self.backbone = FViTBackbone(**config.backbone.dict())
+            self.backbone = FViTBackbone(config)
         elif isinstance(config.backbone, FPNConfig):
             self.backbone = FPNBackbone(config)
         else:

@@ -11,6 +11,34 @@ from .. import utils
 from ..data import Sample
 from ..configs import ModelConfig
 
+def visualize_outputs(outputs:  torch.Tensor):
+    """Create preview for logger
+
+    Args:
+        outputs:
+            Tensor of shape [B, C, H, W]
+
+    Returns:
+        image:
+            Tensor of shape [1, B * H, C * W]
+    """
+    if outputs.ndim == 3:
+        outputs = outputs.unsqueeze(0)
+    B, C, H, W = outputs.shape
+
+    # This actually gives much better results than sigmoid, softmax or thresholding
+    images = torch.clip(torch.tanh(outputs), 0, 1)
+
+    # Stack batches to height
+    images = torch.cat([image for image in images], dim=-2)
+
+    # Stack channels to width
+    images = torch.cat([image for image in images], dim=-1)
+
+    # To [C, H, W]
+    images = images.unsqueeze(0)
+    return images
+
 
 class DBBNHead(nn.Module):
     """Very specific prediction head for text detection.
@@ -60,6 +88,7 @@ class DBBNHead(nn.Module):
         # Background and threshold
         self.heads = nn.ModuleList([nn.Conv2d(self.hidden_size, 1, 1) for _ in range(4)])
         self.inferring = False
+        self.visualize_outputs = visualize_outputs
 
     def forward(self, features, returns_all=False):
         if self.inferring:

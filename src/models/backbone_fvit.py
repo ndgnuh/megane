@@ -47,10 +47,9 @@ class Block(nn.Module):
         self.attention = FactorAttention(hidden_size, heads)
         self.norm_attention = nn.InstanceNorm2d(hidden_size)
         self.mlp = nn.Sequential(
-            nn.Conv2d(hidden_size, hidden_size * 4, kernel_size=1, groups=hidden_size),
+            nn.Conv2d(hidden_size, hidden_size * 4, kernel_size=1),
             nn.ReLU(hidden_size),
-            nn.Conv2d(hidden_size * 4, hidden_size, kernel_size=1, groups=hidden_size),
-            nn.Dropout2d(0.1),
+            nn.Conv2d(hidden_size * 4, hidden_size, kernel_size=1),
         )
         self.norm_mlp = nn.InstanceNorm2d(hidden_size)
 

@@ -1,3 +1,4 @@
+import traceback
 import random
 from os import path, makedirs
 from datetime import datetime
@@ -148,6 +149,7 @@ class Trainer:
         maf1_set = []
         predictions = []
         ground_truths = []
+        raw_outputs = []
 
         # Visualize index
         v_index = random.randint(0, num_batches - 1)
@@ -166,6 +168,7 @@ class Trainer:
                 pr_sample = model.decode_sample(_inputs, _outputs)
                 gt_sample = model.decode_sample(_inputs, _targets * 1.0)
                 predictions.append(pr_sample)
+                raw_outputs.append(_outputs)
                 ground_truths.append(gt_sample)
                 maf1 = compute_maf1(
                     *pr_sample.adapt_metrics(), *gt_sample.adapt_metrics()
@@ -182,6 +185,13 @@ class Trainer:
         logger.add_image(
             "validate/sample-gt", ground_truths[idx].visualize_tensor(), step
         )
+        try:
+            logger.add_image(
+                "validate/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
+            )
+        except Exception:
+            tqdm.write("Cannot visualize raw outputs")
+            logger.add_text("validate/outputs-pr-error", traceback.format_exc(), step)
 
         # Metric
         logger.add_scalar(f"validate/mean-average-F1", np.mean(maf1_set), step)
