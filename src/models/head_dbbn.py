@@ -86,6 +86,8 @@ class DBBNHead(nn.Module):
         self.conv_noise_class = self.noise_class + 2
         self.image_size = config.image_size
         self.hidden_size = config.hidden_size
+        self.final_div_factor = config.head.final_div_factor
+        assert self.image_size % self.final_div_factor == 0
 
         # Background and threshold
         self.heads = nn.ModuleList(
@@ -116,7 +118,7 @@ class DBBNHead(nn.Module):
                 Segmentation masks for training the model.
         """
 
-        output_size = self.image_size // 2
+        output_size = self.image_size // self.final_div_factor
         image = utils.prepare_input(sample.image, self.image_size, self.image_size)
         image = torch.FloatTensor(image)
 
@@ -203,7 +205,8 @@ class DBBNHead(nn.Module):
         _targets = torch.cat([gt_bg, gt_tt, gt_tp, gt_np], dim=1) * 1.0
         loss = self.contour_loss(outputs, _targets)
         loss = F.mse_loss(outputs, _targets) + loss
-        loss = loss / 2
+        loss = F.binary_cross_entropy_with_logits(outputs, _targets) + loss
+        loss = loss / 3
 
         # Loss for bg, text and text threshold
         gt_bg = torch.ones_like(gt_tt)
