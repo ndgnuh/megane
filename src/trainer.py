@@ -156,6 +156,7 @@ class Trainer:
         predictions = []
         ground_truths = []
         raw_outputs = []
+        raw_targets = []
 
         # Visualize index
         v_index = random.randint(0, num_batches - 1)
@@ -174,8 +175,9 @@ class Trainer:
                 pr_sample = model.decode_sample(_inputs, _outputs)
                 gt_sample = model.decode_sample(_inputs, _targets * 1.0)
                 predictions.append(pr_sample)
-                raw_outputs.append(_outputs)
                 ground_truths.append(gt_sample)
+                raw_outputs.append(_outputs.cpu())
+                raw_targets.append(_targets.cpu())
                 maf1 = compute_maf1(
                     *pr_sample.adapt_metrics(), *gt_sample.adapt_metrics()
                 )
@@ -193,6 +195,9 @@ class Trainer:
         )
         logger.add_image(
             "validate/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
+        )
+        logger.add_image(
+            "validate/outputs-gt", model.head.visualize_outputs(raw_targets[idx]), step
         )
 
         # Metric
