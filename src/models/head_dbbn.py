@@ -122,22 +122,28 @@ class DBBNHead(nn.Module):
         image = utils.prepare_input(sample.image, self.image_size, self.image_size)
         image = torch.FloatTensor(image)
 
-        boxes = np.array(sample.boxes)
-        shrink, expand = utils.shrink_expand(boxes, r=0.4)
-        classes = np.array(sample.classes)
+        # Compute shrink/expand distance
+        boxes = sample.boxes
+        areas = list(map(utils.polygon.polygon_area, boxes))
+        lengths = list(map(utils.polygon.polygon_perimeter, boxes))
+        dists = [A * (1 - 0.4 ** 2) / L for (A, L) in zip(areas, lengths)]
+
+        # Generate shrink/expanded polygons
+        shrink = [utils.offset_polygon(p, -d) for (p, d) in zip(boxes, dists)]
+        expand = [utils.offset_polygon(p, d) for (p, d) in zip(boxes, dists)]
 
         # Mask draw helper
-        def dmask(boxes, c_idx, mode="max"):
-            mask = utils.draw_mask(
-                output_size, output_size, boxes[classes == c_idx], copy=False, mode=mode
-            )
+        classes = sample.classes
+        def dmask(boxes, c_idx):
+            boxes_by_class = [boxes[i] for (i, c) in enumerate(classes) if c == c_idx]
+            mask = utils.draw_mask_v2(output_size, output_size, boxes_by_class)
             mask = mask.astype("bool")
             return mask
 
         # Draw masks
-        noise_mask = dmask(boxes, self.noise_class, "round")
-        thres_mask = dmask(expand, self.text_class, "max")
-        text_mask = dmask(shrink, self.text_class, "max")
+        noise_mask = dmask(boxes, self.noise_class)
+        thres_mask = dmask(expand, self.text_class)
+        text_mask = dmask(shrink, self.text_class)
 
         # Target masks
         thres_mask = thres_mask & (~text_mask)
@@ -180,15 +186,20 @@ class DBBNHead(nn.Module):
             raise RuntimeError("Unknown outputs format")
 
         text_mask = text_mask.numpy()
-        boxes, scores = utils.mask_to_box(text_mask, min_score=0.5)
-        boxes = utils.expand(boxes, 1.5)
-        normalizer = np.array([w, h, w, h]).reshape(1, 4)
-        boxes = (boxes * normalizer).round().astype(int)
-        from tqdm import tqdm
+        # TODO: configurable score
+        # TODO: mask to polygon
+        boxes, scores = utils.mask_to_box(text_mask, min_score=0.2)
+        polygons = []
+        for (x1, y1, x2, y2) in boxes:
+            polygon = [(x1, y1),
+                       (x1, y2),
+                       (x2, y2),
+                       (x2, y1)]
+            polygons.append(polygon)
 
         return Sample(
             image=image,
-            boxes=boxes,
+            boxes=polygons,
             classes=np.zeros_like(scores).astype(int).tolist(),
             scores=scores.tolist(),
         )

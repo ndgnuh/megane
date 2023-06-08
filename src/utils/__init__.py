@@ -217,3 +217,25 @@ def mask_to_box(mask, min_score=0.5):
     boxes = boxes[keep, :]
     scores = scores[keep]
     return boxes, scores
+
+
+def draw_mask_v2(width: int, height: int, polygons: np.ndarray):
+    """Draw binary mask using polygon boxes.
+    The mask region has value 1 whenever there's a box in that region.
+
+    Args:
+        width:
+            The mask width.
+        height:
+            The mask height.
+        boxes:
+            A list of polygons (array of shape [L, 2]).
+    Returns:
+        A numpy array of shape [H, W] which is the drawn mask.
+    """
+    # mask_to_box
+    mask = np.zeros((height, width), dtype='float32')
+    for polygon in polygons:
+        polygon = [(int(x * width), int(y * height)) for (x, y) in polygon]
+        mask = cv2.fillConvexPoly(mask, np.array(polygon), 1)
+    return mask

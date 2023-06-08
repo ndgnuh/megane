@@ -1,5 +1,6 @@
 import json
 import os
+import numpy as np
 from base64 import b64decode
 from functools import lru_cache
 from typing import List, Tuple, Optional, Callable
@@ -21,7 +22,7 @@ class Sample:
         image:
             The input Pillow image
         boxes:
-            List of bounding box in the x1, y1, x2, y2 format and
+            List of bounding box in the polygon format and
             has values normalized to (0, 1).
         classes:
             List of classes associated with each bounding boxes
@@ -30,15 +31,25 @@ class Sample:
     """
 
     image: Image
-    boxes: List[Tuple[int, int, int, int]]
+    boxes: List[List[Tuple[float, float]]]
     classes: List[int]
     scores: Optional[List[float]] = None
 
+    def __post_init__(self):
+        # Validate
+        for box in self.boxes:
+            box = np.array(box)
+            assert box.shape[-1] == 2 and box.ndim == 2, f"Invalid bounding box format, {box.shape}"
+            assert box.max() <= 1.1 and box.min() >= -0.1, "Invalid bounding box value"
+
+
     def visualize(self, outline=(255, 0, 0)) -> Image:
         image = self.image.copy()
+        w, h = image.size
         draw = ImageDraw.Draw(image)
-        for x1, y1, x2, y2 in self.boxes:
-            draw.rectangle([(x1, y1), (x2, y2)], outline=outline)
+        for polygon in self.boxes:
+            xy = [(int(x * w), int(y * h)) for (x, y) in polygon]
+            draw.polygon(xy, outline=outline)
         return image
 
     def visualize_tensor(self, *a, **k):
@@ -49,7 +60,6 @@ class Sample:
 
     def adapt_metrics(self):
         import numpy as np
-
         boxes = np.array(self.boxes)
         classes = np.array(self.classes)
         return boxes, classes
@@ -82,11 +92,20 @@ def load_sample_labelme(sample_path, classes):
     for shape in shapes:
         if shape["shape_type"] == "rectangle":
             [x1, y1], [x2, y2] = shape["points"]
-            boxes.append([x1 / width, y1 / height, x2 / width, y2 / height])
+            x1 = x1 / width
+            y1 = y1 / height
+            x2 = x2 / width
+            y2 = y2 / height
+            poly = [(x1, y1),
+                    (x2, y1),
+                    (x2, y2),
+                    (x1, y2)]
+            boxes.append(poly)
         elif shape["shape_type"] == "polygon":
-            xs = [x / width for (x, y) in shape["points"]]
-            ys = [y / height for (x, y) in shape["points"]]
-            boxes.append([min(xs), min(ys), max(xs), max(ys)])
+            # xs = [x / width for (x, y) in shape["points"]]
+            # ys = [y / height for (x, y) in shape["points"]]
+            poly = [(x / width, y / height) for (x, y) in shape["points"]]
+            boxes.append(poly)
         else:
             continue
 

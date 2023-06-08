@@ -168,7 +168,6 @@ class Trainer:
             # Loss
             loss = model.compute_loss(outputs, targets).item()
             losses.append(loss)
-            pbar.set_postfix({"loss": loss})
 
             # Inference output
             for _inputs, _outputs, _targets in zip(images, outputs, targets):
@@ -182,6 +181,7 @@ class Trainer:
                     *pr_sample.adapt_metrics(), *gt_sample.adapt_metrics()
                 )
                 maf1_set.append(maf1)
+                pbar.set_postfix({"loss": loss, "maf1": maf1})
 
         # Logging
         # Visualize
