@@ -14,7 +14,28 @@ def torch_iou(b1, b2):
     return ops.box_iou(b1, b2).numpy()
 
 
-def compute_iou(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
+def compute_iou_polygon(boxes1, boxes2):
+    from shapely.geometry import Polygon
+
+    n = len(boxes1)
+    m = len(boxes2)
+    ious = np.array(n, m)
+    for i in range(n):
+        for j in range(i, m):
+            p1 = Polygon(boxes1[i])
+            p2 = Polygon(boxes2[j])
+            inter = p1.intersection(p2).area
+            union = p1.union(p2).area
+            iou = inter / union
+            ious[i, j] = ious[j, i] = iou
+    return iou
+
+
+def compute_iou(boxes1, boxes2):
+    return compute_iou_polygon(boxes1, boxes2)
+
+
+def compute_iou_xyxy(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
     """Compute IOU between two set of boxes.
     Input boxes must be in [x1, y1, x2, y2] format.
 
