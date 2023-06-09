@@ -126,7 +126,7 @@ class Trainer:
                 torch.save({"images": images[0], "pr": outputs[0], "gt": targets[0]}, "sample-output.pt")
                 b_idx = random.choice(range(images.shape[0]))
                 pr_sample = model.decode_sample(images[b_idx], outputs[b_idx])
-                gt_sample = model.decode_sample(images[b_idx], targets[b_idx])
+                gt_sample = model.decode_sample(images[b_idx], targets[b_idx], ground_truth=True)
                 logger.add_image("train/sample-pr", pr_sample.visualize_tensor(), step)
                 logger.add_image("train/sample-gt", gt_sample.visualize_tensor(), step)
                 logger.add_image(
@@ -178,7 +178,7 @@ class Trainer:
             # Inference output
             for _inputs, _outputs, _targets in zip(images, outputs, targets):
                 pr_sample = model.decode_sample(_inputs, _outputs)
-                gt_sample = model.decode_sample(_inputs, _targets * 1.0)
+                gt_sample = model.decode_sample(_inputs, _targets * 1.0, ground_truth=True)
                 predictions.append(pr_sample)
                 ground_truths.append(gt_sample)
                 raw_outputs.append(_outputs.cpu())
