@@ -1,3 +1,4 @@
+import math
 from io import BytesIO
 from typing import Tuple
 
@@ -240,7 +241,7 @@ def draw_mask_v2(width: int, height: int, polygons: np.ndarray):
     return mask
 
 
-def mask_to_polygon(mask):
+def mask_to_polygon(mask, open_kernel=None):
     """Convert from binary mask to box points polygon
 
     Args:
@@ -254,9 +255,14 @@ def mask_to_polygon(mask):
             Polygon scores based on the input mask.
     """
     height, width = mask.shape
-    cnts, _ = cv2.findContours(
-        (mask * 255).astype("uint8"), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
-    )
+
+    if open_kernel is not None:
+        kernel = np.ones(open_kernel)
+        bin_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    else:
+        bin_mask = mask
+    bin_mask = (bin_mask * 255).astype("uint8")
+    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     def find_score(polygon):
         raster = np.zeros_like(mask, dtype="float32")
@@ -264,12 +270,31 @@ def mask_to_polygon(mask):
         scores = mask * raster
         return scores.sum() / np.count_nonzero(scores)
 
+    def should_square(rect):
+        (x, y), (w, h), a = rect
+        a = abs(a) % 90
+        a = math.radians(a)
+        r = abs(w / h - 1)
+        return min(r, math.sin(a), math.cos(a)) < 0.16 # This is sin(20deg)
+
     polygons = []
     scores = []
     for cnt in cnts:
         rect = cv2.minAreaRect(cnt)
+        (x, y), (w, h), a = rect
+        if h == 0 or w == 0:
+            continue
         polygon = cv2.boxPoints(rect)
         score = find_score(polygon)
+        if should_square(rect):
+            xmin, ymin = np.min(polygon, axis=-2)
+            xmax, ymax = np.max(polygon, axis=-2)
+            polygon = [
+                (xmin, ymin),
+                (xmax, ymin),
+                (xmax, ymax),
+                (xmin, ymax)
+            ]
         polygons.append(polygon)
         scores.append(score)
     return polygons, scores
