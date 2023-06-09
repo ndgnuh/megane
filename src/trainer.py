@@ -81,6 +81,8 @@ class Trainer:
 
         self.train_loader = make_loader(train_data, shuffle=True)
         self.val_loader = make_loader(val_data)
+        tqdm.write(f"Num training batches: {len(self.train_loader)}")
+        tqdm.write(f"Num validation batches: {len(self.val_loader)}")
 
         # Scheduling
         self.total_steps = total_steps
@@ -115,14 +117,18 @@ class Trainer:
             optimizer.step()
             loss = loss.item()
 
+
             # Logging
             logger.add_scalar("train/loss", loss, step)
             pbar.set_postfix({"loss": loss})
 
             if step % print_every == 0:
+                torch.save({"images": images[0], "pr": outputs[0], "gt": targets[0]}, "sample-output.pt")
                 b_idx = random.choice(range(images.shape[0]))
-                sample = model.decode_sample(images[b_idx], outputs[b_idx])
-                logger.add_image("train/sample", sample.visualize_tensor(), step)
+                pr_sample = model.decode_sample(images[b_idx], outputs[b_idx])
+                gt_sample = model.decode_sample(images[b_idx], targets[b_idx])
+                logger.add_image("train/sample-pr", pr_sample.visualize_tensor(), step)
+                logger.add_image("train/sample-gt", gt_sample.visualize_tensor(), step)
                 logger.add_image(
                     "train/outputs-pr", model.head.visualize_outputs(outputs), step
                 )

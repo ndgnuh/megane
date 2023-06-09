@@ -90,3 +90,42 @@ def offset_polygon(poly: List[Tuple[float, float]], offset: float):
         y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - x4 * y3)) / deno
         new_poly.append((x, y))
     return new_poly
+
+
+def offset_polygon_np(p, d):
+    """This version is slower somehow... Do not use"""
+    import numpy as np
+
+    starts = p
+    ends = np.roll(p, -1, axis=0)
+
+    # Finding the normal of each lines
+    n = np.stack([starts[..., 1] - ends[..., 1], ends[..., 0] - starts[..., 0]], axis=1)
+    n = n / np.linalg.norm(n, axis=-1)[..., None]
+
+    # Shift the lines
+    # print(n.shape, np.linalg.norm(n,).shape)
+    shift = n * d
+    starts = starts + shift
+    ends = ends + shift
+
+    # Finding shifted line intersections
+    # https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+    starts1 = starts
+    ends1 = ends
+    starts2 = np.roll(starts1, 1, axis=0)
+    ends2 = np.roll(ends1, 1, axis=0)
+
+    n1 = starts1 - ends1
+    n2 = starts2 - ends2
+    # print(n1.shape, np.linalg.norm(n1, axis=1).shape)
+    n1 = n1 / np.linalg.norm(n1, axis=1)[..., None]
+    n2 = n2 / np.linalg.norm(n2, axis=1)[..., None]
+
+    I = np.eye(2)[None, ...]
+    A1 = I - np.matmul(np.expand_dims(n1, -1), np.expand_dims(n1, -2))
+    A2 = I - np.matmul(n2[..., None], n2[..., None, :])
+    C = np.matmul(A1, ends1[..., None]) + np.matmul(A2, ends2[..., None])
+    S = np.stack([np.linalg.pinv(s) for s in A1 + A2], axis=0)
+    new_polygons = np.matmul(S, C).squeeze(-1)
+    return new_polygons

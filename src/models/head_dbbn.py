@@ -1,5 +1,6 @@
 from typing import *
 
+import cv2
 import torch
 import numpy as np
 from torch.nn import functional as F
@@ -29,7 +30,7 @@ def visualize_outputs(outputs: torch.Tensor):
     B, C, H, W = outputs.shape
 
     # This actually gives much better results than sigmoid, softmax or thresholding
-    images = torch.clip(torch.tanh(outputs), 0, 1)
+    images = torch.sigmoid((outputs * 1.0 - 0.5) * 1e6)
 
     # Stack batches to height
     images = torch.cat([image for image in images], dim=-2)
@@ -123,14 +124,24 @@ class DBBNHead(nn.Module):
         image = torch.FloatTensor(image)
 
         # Compute shrink/expand distance
-        boxes = sample.boxes
-        areas = list(map(utils.polygon.polygon_area, boxes))
-        lengths = list(map(utils.polygon.polygon_perimeter, boxes))
-        dists = [A * (1 - 0.4 ** 2) / L for (A, L) in zip(areas, lengths)]
+        # boxes = [np.array(b, dtype='float32') for b in sample.boxes]
+        boxes = [[(x * output_size, y * output_size) for (x, y) in polygon] for polygon in sample.boxes]
+        shrink = []
+        expand = []
+        r = 0.4
+        for box in boxes:
+            A = utils.polygon_area(box)
+            L = utils.polygon_perimeter(box)
+            D = (1 - r**2) * A / L
+            s_box = utils.offset_polygon(box, -D)
+            e_box = utils.offset_polygon(box, D)
+            shrink.append(s_box)
+            expand.append(e_box)
 
-        # Generate shrink/expanded polygons
-        shrink = [utils.offset_polygon(p, -d) for (p, d) in zip(boxes, dists)]
-        expand = [utils.offset_polygon(p, d) for (p, d) in zip(boxes, dists)]
+        # Box rounding
+        boxes = [np.array(box, dtype=int) for box in boxes]
+        shrink = [np.array(box, dtype=int) for box in shrink]
+        expand = [np.array(box, dtype=int) for box in expand]
 
         # Mask draw helper
         classes = sample.classes
@@ -185,23 +196,33 @@ class DBBNHead(nn.Module):
         else:
             raise RuntimeError("Unknown outputs format")
 
-        text_mask = text_mask.numpy()
         # TODO: configurable score
         # TODO: mask to polygon
-        boxes, scores = utils.mask_to_box(text_mask, min_score=0.2)
+
+        text_mask = torch.sigmoid((text_mask * 1.0 - 0.5) * 1000.0).numpy()
+        mask_size = self.image_size // self.final_div_factor
+        boxes, scores = utils.mask_to_polygon(text_mask)
         polygons = []
-        for (x1, y1, x2, y2) in boxes:
-            polygon = [(x1, y1),
-                       (x1, y2),
-                       (x2, y2),
-                       (x2, y1)]
+        final_scores = []
+        for polygon, score in zip(boxes, scores):
+            if score < 0.5:
+                continue
+            area = utils.polygon_area(polygon)
+            length = utils.polygon_perimeter(polygon)
+            if length == 0 or area == 0:
+                continue
+            d = area * 1.5 / length
+            polygon = utils.offset_polygon(polygon, d)
+            polygon = np.clip(polygon, 0, mask_size)
+            polygon = [(x / mask_size, y / mask_size) for (x, y) in polygon]
             polygons.append(polygon)
+            final_scores.append(score)
 
         return Sample(
             image=image,
             boxes=polygons,
-            classes=np.zeros_like(scores).astype(int).tolist(),
-            scores=scores.tolist(),
+            classes=np.zeros_like(final_scores).astype(int).tolist(),
+            scores=final_scores,
         )
 
     def compute_loss(self, outputs, targets):

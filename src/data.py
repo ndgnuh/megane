@@ -40,7 +40,6 @@ class Sample:
         for box in self.boxes:
             box = np.array(box)
             assert box.shape[-1] == 2 and box.ndim == 2, f"Invalid bounding box format, {box.shape}"
-            assert box.max() <= 1.1 and box.min() >= -0.1, "Invalid bounding box value"
 
 
     def visualize(self, outline=(255, 0, 0)) -> Image:

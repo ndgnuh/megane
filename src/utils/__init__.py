@@ -234,8 +234,85 @@ def draw_mask_v2(width: int, height: int, polygons: np.ndarray):
         A numpy array of shape [H, W] which is the drawn mask.
     """
     # mask_to_box
-    mask = np.zeros((height, width), dtype='float32')
+    mask = np.zeros((height, width), dtype="float32")
     for polygon in polygons:
-        polygon = [(int(x * width), int(y * height)) for (x, y) in polygon]
-        mask = cv2.fillConvexPoly(mask, np.array(polygon), 1)
+        mask = cv2.fillConvexPoly(mask, polygon, 1)
     return mask
+
+
+def mask_to_polygon(mask):
+    """Convert from binary mask to box points polygon
+
+    Args:
+        mask:
+            2D numpy array, value in range 0, 1
+
+    Returns:
+        polygons:
+            List of polygons.
+        scores:
+            Polygon scores based on the input mask.
+    """
+    height, width = mask.shape
+    cnts, _ = cv2.findContours(
+        (mask * 255).astype("uint8"), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    def find_score(polygon):
+        raster = np.zeros_like(mask, dtype="float32")
+        raster = cv2.fillConvexPoly(raster, polygon.astype(int), 1)
+        scores = mask * raster
+        return scores.sum() / np.count_nonzero(scores)
+
+    polygons = []
+    scores = []
+    for cnt in cnts:
+        rect = cv2.minAreaRect(cnt)
+        polygon = cv2.boxPoints(rect)
+        score = find_score(polygon)
+        polygons.append(polygon)
+        scores.append(score)
+    return polygons, scores
+
+
+def shrink_polygon(polygon, r=0.4, A=None, L=None):
+    """Shrink polygon using DB formula.
+    Dist = (1 - r^2) * A / L
+
+    Args:
+        polygon:
+            List of x y points
+        r:
+            Shrink ratio, default = 0.4
+        A:
+            Area of the polygon, will be computed if None is provided
+        L:
+            Length of the polygon, will be computed if None is provided
+
+    Returns:
+        The shrinked polygon.
+    """
+    A = A or polygon_area(poly)
+    L = L or polygon_perimeter(poly)
+    D = (1 - r**2) * A / L
+    return offset_polygon(polygon, -D)
+
+
+def expand_polygon(polygon, r=1.5, A=None, L=None):
+    """Expand polygon using DB formula.
+    Dist = r * A / L.
+
+    Args:
+        polygon:
+            List of x y points
+        r:
+            Expand ratio, default = 1.5
+        A:
+            Area of the polygon, will be computed if None is provided
+        L:
+            Length of the polygon, will be computed if None is provided
+    """
+    A = A or polygon_area(poly)
+    L = L or polygon_perimeter(poly)
+    D = r * A / L
+    return offset_polygon(polygon, D)

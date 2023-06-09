@@ -1,5 +1,6 @@
 from typing import Tuple
 import numpy as np
+from shapely.geometry import Polygon
 
 
 def torch_iou(b1, b2):
@@ -27,18 +28,24 @@ def compute_iou_polygon(boxes1, boxes2):
     Returns:
         Numpy array size n * m of IoU scores.
     """
-    from shapely.geometry import Polygon
     n = len(boxes1)
     m = len(boxes2)
     ious = np.zeros((n, m), dtype='float32')
+    polygons1 = [Polygon(b) for b in boxes1]
+    polygons2 = [Polygon(b) for b in boxes2]
+    areas1 = [p.area for p in polygons1]
+    areas2 = [p.area for p in polygons2]
     for i in range(n):
-        for j in range(i, m):
-            p1 = Polygon(boxes1[i])
-            p2 = Polygon(boxes2[j])
+        for j in range(m):
+            p1 = polygons1[i]
+            p2 = polygons2[j]
+            if not p1.intersects(p2):
+                continue
             inter = p1.intersection(p2).area
-            union = p1.union(p2).area
+            union = areas1[i] + areas2[j] - inter
             iou = inter / union
-            ious[i, j] = ious[j, i] = iou
+            ious[i, j] = iou
+
     return ious
 
 
