@@ -16,6 +16,7 @@ from .head_dbbn import DBBNHead
 from .backbone_fpn import FPNBackbone
 from .backbone_fvit import FViTBackbone
 from .backbone_pcvit import PCViTBackbone
+from .api import ModelAPI
 
 
 class Model(nn.Module):
@@ -32,12 +33,13 @@ class Model(nn.Module):
             self.backbone = PCViTBackbone(config)
         else:
             raise ValueError(f"Unsupported backbone {config.backbone}")
-        self.head = DBBNHead(config)
+        self.head: ModelAPI = DBBNHead(config)
 
         # Delegation
         self.encode_sample = self.head.encode_sample
         self.decode_sample = self.head.decode_sample
         self.compute_loss = self.head.compute_loss
+        self.collate_fn = self.head.collate_fn
         self.set_infer(False)
 
     def forward(self, images: Tensor):

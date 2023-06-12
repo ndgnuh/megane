@@ -12,6 +12,7 @@ from .. import utils
 from ..data import Sample
 from ..configs import ModelConfig
 from .losses import ContourLoss
+from .api import ModelAPI
 
 
 def visualize_outputs(outputs: torch.Tensor):
@@ -43,7 +44,7 @@ def visualize_outputs(outputs: torch.Tensor):
     return images
 
 
-class DBBNHead(nn.Module):
+class DBBNHead(ModelAPI):
     """Very specific prediction head for text detection.
 
     Predict toggle-able channels of text, noise, background and thresholds.
@@ -95,8 +96,11 @@ class DBBNHead(nn.Module):
             [nn.Conv2d(self.hidden_size, 1, 1) for _ in range(4)]
         )
         self.inferring = False
-        self.visualize_outputs = visualize_outputs
-        self.contour_loss = ContourLoss(kernel_size=config.head.contour_loss_kernel)
+        self.contour_loss = ContourLoss(
+            kernel_size=config.head.contour_loss_kernel)
+
+    def visualize_outputs(self, outputs, ground_truth: bool = False):
+        return visualize_outputs(outputs)
 
     def forward(self, features, returns_all=False):
         if self.inferring:
@@ -120,12 +124,16 @@ class DBBNHead(nn.Module):
         """
 
         output_size = self.image_size // self.final_div_factor
-        image = utils.prepare_input(sample.image, self.image_size, self.image_size)
+        image = utils.prepare_input(
+            sample.image, self.image_size, self.image_size)
         image = torch.FloatTensor(image)
 
         # Compute shrink/expand distance
         # boxes = [np.array(b, dtype='float32') for b in sample.boxes]
-        boxes = [[(x * output_size, y * output_size) for (x, y) in polygon] for polygon in sample.boxes]
+        boxes = [
+            [(x * output_size, y * output_size) for (x, y) in polygon]
+            for polygon in sample.boxes
+        ]
         shrink = []
         expand = []
         r = 0.4
@@ -145,8 +153,10 @@ class DBBNHead(nn.Module):
 
         # Mask draw helper
         classes = sample.classes
+
         def dmask(boxes, c_idx):
-            boxes_by_class = [boxes[i] for (i, c) in enumerate(classes) if c == c_idx]
+            boxes_by_class = [boxes[i]
+                              for (i, c) in enumerate(classes) if c == c_idx]
             mask = utils.draw_mask_v2(output_size, output_size, boxes_by_class)
             mask = mask.astype("bool")
             return mask
@@ -162,7 +172,13 @@ class DBBNHead(nn.Module):
 
         return image, masks
 
-    def decode_sample(self, inputs, outputs, sample: Optional[Sample] = None) -> Sample:
+    def decode_sample(
+        self,
+        inputs,
+        outputs,
+        sample: Optional[Sample] = None,
+        ground_truth: bool = False,
+    ) -> Sample:
         """Return a sample from raw model outputs
         Args:
             inputs:
@@ -174,6 +190,8 @@ class DBBNHead(nn.Module):
                 If C = 3 (ground truth), the second channel will be used.
             sample:
                 The input sample, this is only used to get the image.
+            ground_truth:
+                Specify if this is decoded from the ground truth
 
         Returns:
             The decoded sample.
@@ -199,7 +217,10 @@ class DBBNHead(nn.Module):
         # TODO: configurable score
         # TODO: mask to polygon
 
-        text_mask = torch.sigmoid((text_mask * 1.0 - 0.5) * 1000.0).numpy()
+        if ground_truth:
+            text_mask = text_mask.numpy()
+        else:
+            text_mask = torch.clip(torch.tanh(text_mask), 0, 1).numpy()
         mask_size = self.image_size // self.final_div_factor
         boxes, scores = utils.mask_to_polygon(text_mask)
         polygons = []
