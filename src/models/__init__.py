@@ -11,8 +11,12 @@ from torchvision.transforms import functional as TF
 
 from ..data import Sample
 from .. import utils
-from ..configs import ModelConfig, FViTConfig, FPNConfig, PCViTConfig
+from ..configs import (
+    ModelConfig, FViTConfig, FPNConfig, PCViTConfig,
+    HeadConfig, Seq2seqConfig
+)
 from .head_dbbn import DBBNHead
+from .head_seq2seq import Seq2seq
 from .backbone_fpn import FPNBackbone
 from .backbone_fvit import FViTBackbone
 from .backbone_pcvit import PCViTBackbone
@@ -33,7 +37,12 @@ class Model(nn.Module):
             self.backbone = PCViTBackbone(config)
         else:
             raise ValueError(f"Unsupported backbone {config.backbone}")
-        self.head: ModelAPI = DBBNHead(config)
+
+        if isinstance(config.head, HeadConfig):
+            self.head: ModelAPI = DBBNHead(config)
+        if isinstance(config.head, Seq2seqConfig):
+            self.head: ModelAPI = Seq2seq(config)
+        assert isinstance(self.head, ModelAPI)
 
         # Delegation
         self.encode_sample = self.head.encode_sample
@@ -42,9 +51,9 @@ class Model(nn.Module):
         self.collate_fn = self.head.collate_fn
         self.set_infer(False)
 
-    def forward(self, images: Tensor):
+    def forward(self, images: Tensor, targets: Optional[Tensor] = None):
         features = self.backbone(images)
-        outputs = self.head(features)
+        outputs = self.head(features, targets)
         return outputs
 
     def set_infer(self, infer: bool):

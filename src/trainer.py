@@ -12,7 +12,7 @@ from tqdm import tqdm
 from lightning import Fabric
 from tensorboardX import SummaryWriter
 
-from .models import Model
+from .models import Model, ModelAPI
 from .data import TextDetectionDataset
 from .meanap import compute_maf1
 from .configs import TrainConfig, ModelConfig
@@ -64,7 +64,7 @@ class Trainer:
         self.fabric = Fabric(**fabric_config)
 
         # Model & optimization
-        self.model = Model(model_config)
+        self.model: ModelAPI = Model(model_config)
         if model_config.continue_weight:
             self.model.load_state_dict(
                 torch.load(model_config.continue_weight, map_location="cpu")
@@ -77,7 +77,8 @@ class Trainer:
             data = TextDetectionDataset(
                 data, model_config.classes, transform=self.model.encode_sample
             )
-            return DataLoader(data, **dataloader_config, **kwargs)
+            return DataLoader(data, **dataloader_config, **kwargs,
+                              collate_fn=self.model.collate_fn)
 
         self.train_loader = make_loader(train_data, shuffle=True)
         self.val_loader = make_loader(val_data)
@@ -110,30 +111,35 @@ class Trainer:
         for step, (images, targets) in pbar:
             # Train step
             optimizer.zero_grad()
-            outputs = model(images)
+            outputs = model(images, targets)
             loss = model.compute_loss(outputs, targets)
             fabric.backward(loss)
             # fabric.clip_gradients(model, optimizer, max_norm=5)
             optimizer.step()
             loss = loss.item()
 
-
             # Logging
             logger.add_scalar("train/loss", loss, step)
             pbar.set_postfix({"loss": loss})
 
             if step % print_every == 0:
-                torch.save({"images": images[0], "pr": outputs[0], "gt": targets[0]}, "sample-output.pt")
+                torch.save(
+                    {"images": images[0], "pr": outputs[0], "gt": targets[0]}, "sample-output.pt")
                 b_idx = random.choice(range(images.shape[0]))
                 pr_sample = model.decode_sample(images[b_idx], outputs[b_idx])
-                gt_sample = model.decode_sample(images[b_idx], targets[b_idx], ground_truth=True)
-                logger.add_image("train/sample-pr", pr_sample.visualize_tensor(), step)
-                logger.add_image("train/sample-gt", gt_sample.visualize_tensor(), step)
+                gt_sample = model.decode_sample(
+                    images[b_idx], targets[b_idx], ground_truth=True)
+                logger.add_image("train/sample-pr",
+                                 pr_sample.visualize_tensor(), step)
+                logger.add_image("train/sample-gt",
+                                 gt_sample.visualize_tensor(), step)
                 logger.add_image(
-                    "train/outputs-pr", model.head.visualize_outputs(outputs), step
+                    "train/outputs-pr", model.head.visualize_outputs(
+                        outputs), step
                 )
                 logger.add_image(
-                    "train/outputs-gt", model.head.visualize_outputs(targets), step
+                    "train/outputs-gt", model.head.visualize_outputs(
+                        targets), step
                 )
                 logger.flush()
 
@@ -169,7 +175,7 @@ class Trainer:
         pbar = tqdm(dataloader, "Validating")
         for idx, (images, targets) in enumerate(pbar):
             # Step
-            outputs = model(images)
+            outputs = model(images, targets)
 
             # Loss
             loss = model.compute_loss(outputs, targets).item()
@@ -178,7 +184,8 @@ class Trainer:
             # Inference output
             for _inputs, _outputs, _targets in zip(images, outputs, targets):
                 pr_sample = model.decode_sample(_inputs, _outputs)
-                gt_sample = model.decode_sample(_inputs, _targets * 1.0, ground_truth=True)
+                gt_sample = model.decode_sample(
+                    _inputs, _targets * 1.0, ground_truth=True)
                 predictions.append(pr_sample)
                 ground_truths.append(gt_sample)
                 raw_outputs.append(_outputs.cpu())
@@ -200,10 +207,12 @@ class Trainer:
             "validate/sample-gt", ground_truths[idx].visualize_tensor(), step
         )
         logger.add_image(
-            "validate/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
+            "validate/outputs-pr", model.head.visualize_outputs(
+                raw_outputs[idx]), step
         )
         logger.add_image(
-            "validate/outputs-gt", model.head.visualize_outputs(raw_targets[idx]), step
+            "validate/outputs-gt", model.head.visualize_outputs(
+                raw_targets[idx]), step
         )
 
         # Metric

@@ -102,7 +102,7 @@ class DBBNHead(ModelAPI):
     def visualize_outputs(self, outputs, ground_truth: bool = False):
         return visualize_outputs(outputs)
 
-    def forward(self, features, returns_all=False):
+    def forward(self, features, targets=None):
         if self.inferring:
             outputs = self.heads[self.conv_text_class](features)
         else:
