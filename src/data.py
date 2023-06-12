@@ -5,7 +5,7 @@ from base64 import b64decode
 from functools import lru_cache
 from typing import List, Tuple, Optional, Callable
 from os import path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from PIL import Image, ImageDraw
 from torch.utils.data import Dataset, DataLoader
@@ -31,8 +31,8 @@ class Sample:
     """
 
     image: Image
-    boxes: List[List[Tuple[float, float]]]
-    classes: List[int]
+    boxes: List[List[Tuple[float, float]]] = field(default_factory=list)
+    classes: List[int] = field(default_factory=list)
     scores: Optional[List[float]] = None
 
     def __post_init__(self):
