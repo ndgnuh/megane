@@ -1,3 +1,5 @@
+configs*
+data*
 logs*
 weights*
 notebooks/*
