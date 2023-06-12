@@ -262,7 +262,8 @@ def mask_to_polygon(mask, open_kernel=None):
     else:
         bin_mask = mask
     bin_mask = (bin_mask * 255).astype("uint8")
-    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, _ = cv2.findContours(
+        bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     def find_score(polygon):
         raster = np.zeros_like(mask, dtype="float32")
@@ -275,7 +276,7 @@ def mask_to_polygon(mask, open_kernel=None):
         a = abs(a) % 90
         a = math.radians(a)
         r = abs(w / h - 1)
-        return min(r, math.sin(a), math.cos(a)) < 0.16 # This is sin(20deg)
+        return min(r, math.sin(a), math.cos(a)) < 0.16  # This is sin(20deg)
 
     polygons = []
     scores = []
@@ -341,3 +342,18 @@ def expand_polygon(polygon, r=1.5, A=None, L=None):
     L = L or polygon_perimeter(poly)
     D = r * A / L
     return offset_polygon(polygon, D)
+
+
+def polygon2xyxy(polygon):
+    xmin = min(x for x, y in polygon)
+    xmax = max(x for x, y in polygon)
+    ymin = min(y for x, y in polygon)
+    ymax = max(y for x, y in polygon)
+    return xmin, ymin, xmax, ymax
+
+def xyxy2polygon(xyxy):
+    xmin, ymin, xmax, ymax = xyxy
+    return [(xmin, ymin),
+            (xmax, ymin),
+            (xmax, ymax),
+            (xmin, ymax)]
