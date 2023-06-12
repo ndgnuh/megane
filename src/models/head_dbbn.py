@@ -284,3 +284,6 @@ class DBBNHead(ModelAPI):
 
         loss = loss + c_loss_t + c_loss_n + c_loss_tn
         return loss
+
+    def collate_fn(self, samples):
+        return default_collate(samples)

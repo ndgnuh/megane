@@ -1,7 +1,6 @@
 from typing import TypeVar
 from abc import ABC, abstractmethod
 from torch import nn, Tensor
-from torch.utils.data import default_collate
 from ..data import Sample
 
 T = TypeVar("T")
@@ -26,5 +25,6 @@ class ModelAPI(nn.Module, ABC):
     def visualize_outputs(self, outputs, grouth_truth: bool = False) -> Tensor:
         ...
 
+    @abstractmethod
     def collate_fn(self, samples):
-        return default_collate(samples)
+        ...
