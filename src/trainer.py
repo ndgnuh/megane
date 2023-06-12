@@ -145,6 +145,7 @@ class Trainer:
 
             if step % validate_every == 0:
                 self.validate(step)
+                model = model.train()
                 logger.flush()
                 self.save_weight(self.latest_weight_path)
 
@@ -182,14 +183,17 @@ class Trainer:
             losses.append(loss)
 
             # Inference output
-            for _inputs, _outputs, _targets in zip(images, outputs, targets):
+            for i in range(images.shape[0]):
+                _inputs = images[i]
+                _outputs = outputs[i]
+                _targets = targets[i]
+
                 pr_sample = model.decode_sample(_inputs, _outputs)
-                gt_sample = model.decode_sample(
-                    _inputs, _targets * 1.0, ground_truth=True)
+                gt_sample = model.decode_sample(_inputs, _targets, ground_truth=True)
                 predictions.append(pr_sample)
                 ground_truths.append(gt_sample)
-                raw_outputs.append(_outputs.cpu())
-                raw_targets.append(_targets.cpu())
+                raw_outputs.append(_outputs)
+                raw_targets.append(_targets)
                 maf1 = compute_maf1(
                     *pr_sample.adapt_metrics(), *gt_sample.adapt_metrics()
                 )
