@@ -1,6 +1,7 @@
-from typing import Tuple
+import cv2
 import numpy as np
-from shapely.geometry import Polygon
+from typing import Tuple
+from . import utils
 
 
 def torch_iou(b1, b2):
@@ -31,17 +32,15 @@ def compute_iou_polygon(boxes1, boxes2):
     n = len(boxes1)
     m = len(boxes2)
     ious = np.zeros((n, m), dtype='float32')
-    polygons1 = [Polygon(b) for b in boxes1]
-    polygons2 = [Polygon(b) for b in boxes2]
-    areas1 = [p.area for p in polygons1]
-    areas2 = [p.area for p in polygons2]
+    polygons1 = [np.array(b, dtype='float32') for b in boxes1]
+    polygons2 = [np.array(b, dtype='float32') for b in boxes2]
+    areas1 = [utils.polygon_area(b) for b in boxes1]
+    areas2 = [utils.polygon_area(b) for b in boxes2]
     for i in range(n):
         for j in range(m):
             p1 = polygons1[i]
             p2 = polygons2[j]
-            if not p1.intersects(p2):
-                continue
-            inter = p1.intersection(p2).area
+            inter, _ = cv2.intersectConvexConvex(p1, p2)
             union = areas1[i] + areas2[j] - inter
             iou = inter / union
             ious[i, j] = iou
