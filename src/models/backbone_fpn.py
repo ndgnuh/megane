@@ -67,7 +67,8 @@ class UpscaleConcat(nn.Module):
         for idx in range(num_upscales):
             channels = feature_size * (idx + 1)
             conv = nn.Sequential(
-                nn.ConvTranspose2d(channels, channels, 2, stride=2, groups=channels),
+                nn.ConvTranspose2d(channels, channels, 2,
+                                   stride=2, groups=channels),
                 nn.InstanceNorm2d(channels),
                 nn.ReLU(),
                 nn.Conv2d(channels, channels, 1),
@@ -106,9 +107,6 @@ class FPNBackbone(nn.Module):
         # FPN
         self.fpn = self._mk_fpn()
 
-        # Extra layers for upscaling
-        self.neck = UpscaleConcat(self.aux_size, self.num_layers)
-
     def _mk_backbone(self):
         arch = self.config.backbone.arch
         feature_module = self.config.backbone.feature_module
@@ -135,5 +133,4 @@ class FPNBackbone(nn.Module):
     def forward(self, images):
         features = self.backbone(images)
         features = self.fpn(features)
-        features = self.neck(features)
         return features
