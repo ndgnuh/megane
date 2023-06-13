@@ -1,0 +1,10 @@
+[MAIN]
+
+[MESSAGES CONTROL]
+disable=
+	invalid-name,
+	too-few-public-methods,
+	unused-wildcard-import,
+	c-extension-no-member,
+	too-many-locals,
+	duplicate-code,
