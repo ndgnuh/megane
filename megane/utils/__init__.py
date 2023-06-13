@@ -262,8 +262,7 @@ def mask_to_polygon(mask, open_kernel=None):
     else:
         bin_mask = mask
     bin_mask = (bin_mask * 255).astype("uint8")
-    cnts, _ = cv2.findContours(
-        bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     def find_score(polygon):
         raster = np.zeros_like(mask, dtype="float32")
@@ -290,12 +289,7 @@ def mask_to_polygon(mask, open_kernel=None):
         if should_square(rect):
             xmin, ymin = np.min(polygon, axis=-2)
             xmax, ymax = np.max(polygon, axis=-2)
-            polygon = [
-                (xmin, ymin),
-                (xmax, ymin),
-                (xmax, ymax),
-                (xmin, ymax)
-            ]
+            polygon = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
         polygons.append(polygon)
         scores.append(score)
     return polygons, scores
@@ -354,10 +348,7 @@ def polygon2xyxy(polygon):
 
 def xyxy2polygon(xyxy):
     xmin, ymin, xmax, ymax = xyxy
-    return [(xmin, ymin),
-            (xmax, ymin),
-            (xmax, ymax),
-            (xmin, ymax)]
+    return [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
 
 
 def init_from_ns(ns, config: Dict):

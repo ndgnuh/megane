@@ -96,8 +96,7 @@ class DBBNHead(ModelAPI):
             [nn.Conv2d(self.hidden_size, 1, 1) for _ in range(4)]
         )
         self.inferring = False
-        self.contour_loss = ContourLoss(
-            kernel_size=config.head.contour_loss_kernel)
+        self.contour_loss = ContourLoss(kernel_size=config.head.contour_loss_kernel)
 
     def visualize_outputs(self, outputs, ground_truth: bool = False):
         return visualize_outputs(outputs)
@@ -124,8 +123,7 @@ class DBBNHead(ModelAPI):
         """
 
         output_size = self.image_size // self.final_div_factor
-        image = utils.prepare_input(
-            sample.image, self.image_size, self.image_size)
+        image = utils.prepare_input(sample.image, self.image_size, self.image_size)
         image = torch.FloatTensor(image)
 
         # Compute shrink/expand distance
@@ -155,8 +153,7 @@ class DBBNHead(ModelAPI):
         classes = sample.classes
 
         def dmask(boxes, c_idx):
-            boxes_by_class = [boxes[i]
-                              for (i, c) in enumerate(classes) if c == c_idx]
+            boxes_by_class = [boxes[i] for (i, c) in enumerate(classes) if c == c_idx]
             mask = utils.draw_mask_v2(output_size, output_size, boxes_by_class)
             mask = mask.astype("bool")
             return mask

@@ -23,5 +23,3 @@ class MultiscaleConv(nn.Module):
     def forward(self, images):
         features = [conv(images) for conv in self.convs]
         return torch.cat(features, dim=1)
-
-

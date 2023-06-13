@@ -12,6 +12,7 @@ class Contour(nn.Module):
         images:
             Tensor of shape N, C, H, W.
     """
+
     def __init__(self, kernel_size=3):
         super().__init__()
         self.dilate = nn.MaxPool2d(kernel_size, stride=1)
@@ -40,6 +41,7 @@ class ContourLoss(nn.Module):
     References:
         - https://proceedings.mlr.press/v143/el-jurdi21a/el-jurdi21a.pdf
     """
+
     def __init__(self, kernel_size: int = 3):
         super().__init__()
         self.contour = Contour(kernel_size)

@@ -10,8 +10,14 @@ from torchvision.ops import FeaturePyramidNetwork
 from torchvision.transforms import functional as TF
 
 from .. import configs, utils
-from ..configs import (FPNConfig, FViTConfig, HeadConfig, ModelConfig,
-                       PCViTConfig, Seq2seqConfig)
+from ..configs import (
+    FPNConfig,
+    FViTConfig,
+    HeadConfig,
+    ModelConfig,
+    PCViTConfig,
+    Seq2seqConfig,
+)
 from ..data import Sample
 from .api import ModelAPI
 from .backbone_fpn import FPNBackbone
@@ -30,6 +36,7 @@ class backbones:
 
 class necks:
     from .neck_fpnconcat import FPNConcat as fpn_concat
+
     none = nn.Identity
 
 
@@ -79,5 +86,6 @@ class Model(nn.Module):
             self.train()
         for module in self.modules():
             assert not hasattr(module, "infer") or isinstance(
-                getattr(module, "infer"), bool)
+                getattr(module, "infer"), bool
+            )
             module.infer = infer

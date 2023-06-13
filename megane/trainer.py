@@ -77,8 +77,9 @@ class Trainer:
             data = TextDetectionDataset(
                 data, model_config.classes, transform=self.model.encode_sample
             )
-            return DataLoader(data, **dataloader_config, **kwargs,
-                              collate_fn=self.model.collate_fn)
+            return DataLoader(
+                data, **dataloader_config, **kwargs, collate_fn=self.model.collate_fn
+            )
 
         self.train_loader = make_loader(train_data, shuffle=True)
         self.val_loader = make_loader(val_data)
@@ -124,22 +125,21 @@ class Trainer:
 
             if step % print_every == 0:
                 torch.save(
-                    {"images": images[0], "pr": outputs[0], "gt": targets[0]}, "sample-output.pt")
+                    {"images": images[0], "pr": outputs[0], "gt": targets[0]},
+                    "sample-output.pt",
+                )
                 b_idx = random.choice(range(images.shape[0]))
                 pr_sample = model.decode_sample(images[b_idx], outputs[b_idx])
                 gt_sample = model.decode_sample(
-                    images[b_idx], targets[b_idx], ground_truth=True)
-                logger.add_image("train/sample-pr",
-                                 pr_sample.visualize_tensor(), step)
-                logger.add_image("train/sample-gt",
-                                 gt_sample.visualize_tensor(), step)
+                    images[b_idx], targets[b_idx], ground_truth=True
+                )
+                logger.add_image("train/sample-pr", pr_sample.visualize_tensor(), step)
+                logger.add_image("train/sample-gt", gt_sample.visualize_tensor(), step)
                 logger.add_image(
-                    "train/outputs-pr", model.head.visualize_outputs(
-                        outputs), step
+                    "train/outputs-pr", model.head.visualize_outputs(outputs), step
                 )
                 logger.add_image(
-                    "train/outputs-gt", model.head.visualize_outputs(
-                        targets), step
+                    "train/outputs-gt", model.head.visualize_outputs(targets), step
                 )
                 logger.flush()
 
@@ -211,12 +211,10 @@ class Trainer:
             "validate/sample-gt", ground_truths[idx].visualize_tensor(), step
         )
         logger.add_image(
-            "validate/outputs-pr", model.head.visualize_outputs(
-                raw_outputs[idx]), step
+            "validate/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
         )
         logger.add_image(
-            "validate/outputs-gt", model.head.visualize_outputs(
-                raw_targets[idx]), step
+            "validate/outputs-gt", model.head.visualize_outputs(raw_targets[idx]), step
         )
 
         # Metric

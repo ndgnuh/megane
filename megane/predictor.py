@@ -5,8 +5,12 @@ from .configs import ModelConfig
 from .models import Model
 from .utils import prepare_input
 
+
 class Predictor:
-    def __init__(self, model_config, ):
+    def __init__(
+        self,
+        model_config,
+    ):
         self.model = Model(model_config)
         self.model.load_state_dict(
             torch.load(model_config.inference_weight, map_location="cpu")

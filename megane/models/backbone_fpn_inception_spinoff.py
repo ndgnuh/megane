@@ -6,7 +6,7 @@ def ConvIR(in_channels, out_channels, *a, **k):
     return nn.Sequential(
         nn.Conv2d(in_channels, out_channels, *a, **k),
         nn.InstanceNorm2d(out_channels),
-        nn.ReLU()
+        nn.ReLU(),
     )
 
 
@@ -15,12 +15,13 @@ class Block(nn.Module):
         super().__init__()
         hidden_channels = channels // 4
         self.skip = stride == 1 and out_channels == channels
-        self.conv_1 = ConvIR(channels, hidden_channels,
-                             (3, 1), padding=(1, 0), stride=stride)
-        self.conv_2 = ConvIR(channels, hidden_channels,
-                             (1, 3), padding=(0, 1), stride=stride)
-        self.conv_3 = ConvIR(channels, hidden_channels,
-                             3, padding=1, stride=stride)
+        self.conv_1 = ConvIR(
+            channels, hidden_channels, (3, 1), padding=(1, 0), stride=stride
+        )
+        self.conv_2 = ConvIR(
+            channels, hidden_channels, (1, 3), padding=(0, 1), stride=stride
+        )
+        self.conv_3 = ConvIR(channels, hidden_channels, 3, padding=1, stride=stride)
         self.conv_4 = ConvIR(channels, hidden_channels, 1, stride=stride)
         self.mixer = ConvIR(channels, out_channels, 1)
 
@@ -66,19 +67,21 @@ class Network(nn.Module):
 
         stage1 = nn.Sequential(
             ConvIR(3, hidden_sizes[0], 7, stride=2, padding=3),
-            ConvIR(hidden_sizes[0], hidden_sizes[0], 5, stride=2, padding=2)
+            ConvIR(hidden_sizes[0], hidden_sizes[0], 5, stride=2, padding=2),
         )
         stages.append(stage1)
 
         for i, num_blocks_ in enumerate(num_blocks):
-            stage = Stage(hidden_sizes[i], hidden_sizes[i+1], num_blocks_)
+            stage = Stage(hidden_sizes[i], hidden_sizes[i + 1], num_blocks_)
             stages.append(stage)
 
         self.stages = nn.ModuleList(stages)
-        self.projections = nn.ModuleList([
-            ConvIR(h1, hidden_sizes[-1] // len(hidden_sizes), 1)
-            for h1 in hidden_sizes
-        ])
+        self.projections = nn.ModuleList(
+            [
+                ConvIR(h1, hidden_sizes[-1] // len(hidden_sizes), 1)
+                for h1 in hidden_sizes
+            ]
+        )
 
     def forward(self, images):
         outputs = []

@@ -13,9 +13,9 @@ class ModelAPI(nn.Module, ABC):
         ...
 
     @abstractmethod
-    def decode_sample(self,
-                      inputs: Tensor, outputs: Tensor,
-                      ground_truth: bool = False) -> Sample:
+    def decode_sample(
+        self, inputs: Tensor, outputs: Tensor, ground_truth: bool = False
+    ) -> Sample:
         ...
 
     @abstractmethod

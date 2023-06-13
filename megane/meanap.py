@@ -31,9 +31,9 @@ def compute_iou_polygon(boxes1, boxes2):
     """
     n = len(boxes1)
     m = len(boxes2)
-    ious = np.zeros((n, m), dtype='float32')
-    polygons1 = [np.array(b, dtype='float32') for b in boxes1]
-    polygons2 = [np.array(b, dtype='float32') for b in boxes2]
+    ious = np.zeros((n, m), dtype="float32")
+    polygons1 = [np.array(b, dtype="float32") for b in boxes1]
+    polygons2 = [np.array(b, dtype="float32") for b in boxes2]
     areas1 = [utils.polygon_area(b) for b in boxes1]
     areas2 = [utils.polygon_area(b) for b in boxes2]
     for i in range(n):

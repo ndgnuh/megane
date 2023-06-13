@@ -17,12 +17,8 @@ class BatchList(list):
 class Encoder(nn.Module):
     def __init__(self, input_size, hidden_size, dropout=0.1):
         super().__init__()
-        self.rnn = nn.GRU(input_size, hidden_size,
-                          bidirectional=True, batch_first=True)
-        self.fc = nn.Sequential(
-            nn.Linear(hidden_size * 2, hidden_size),
-            nn.Tanh()
-        )
+        self.rnn = nn.GRU(input_size, hidden_size, bidirectional=True, batch_first=True)
+        self.fc = nn.Sequential(nn.Linear(hidden_size * 2, hidden_size), nn.Tanh())
         self.dropout = nn.Dropout(dropout)
         self.tanh = nn.Tanh()
 
@@ -31,6 +27,7 @@ class Encoder(nn.Module):
         last_hidden = torch.cat(last_hidden.chunk(2, dim=0), dim=-1).squeeze(0)
         last_hidden = self.fc(last_hidden)
         return outputs, last_hidden
+
 
 class Attention(nn.Module):
     def __init__(self, hidden_size):
@@ -65,13 +62,11 @@ class Seq2seq(ModelAPI):
         self.localize = nn.Linear(head_size, 4, bias=False)
 
         # classification
-        self.classify = nn.Linear(
-            head_size, config.head.num_classes + 1, bias=False)
+        self.classify = nn.Linear(head_size, config.head.num_classes + 1, bias=False)
 
         # auxilary task
         self.count = nn.Sequential(
-            nn.LayerNorm(head_size),
-            nn.Linear(head_size, num_max_objects)
+            nn.LayerNorm(head_size), nn.Linear(head_size, num_max_objects)
         )
         raise RuntimeError("This idea DOES NOT WORK, use something else")
 
@@ -115,7 +110,7 @@ class Seq2seq(ModelAPI):
         boxes = []
         num_targets = []
         max_length: int = max(num_targets for _, _, _, num_targets in samples)
-        for (image, boxes_, classes_, num_targets_) in samples:
+        for image, boxes_, classes_, num_targets_ in samples:
             images.append(image)
             num_targets.append(num_targets_)
 
@@ -168,10 +163,7 @@ class Seq2seq(ModelAPI):
         boxes = [xyxy2polygon(b) for b in locs.cpu().detach().numpy()]
         classes = classes.cpu().detach().numpy()
         scores = scores.cpu().detach().numpy()
-        return Sample(image=image,
-                      boxes=boxes,
-                      classes=classes,
-                      scores=scores)
+        return Sample(image=image, boxes=boxes, classes=classes, scores=scores)
 
     def visualize_outputs(self, outputs, **k):
         return torch.ones(1, 10, 10)

@@ -13,8 +13,7 @@ class PatchEmbedding(nn.Module):
         self.embeds = nn.ModuleList(
             [
                 nn.Sequential(
-                    nn.Conv2d(hidden_size, hidden_size,
-                              3, stride=2, padding=1),
+                    nn.Conv2d(hidden_size, hidden_size, 3, stride=2, padding=1),
                     nn.InstanceNorm2d(hidden_size),
                     nn.ReLU(),
                 )
@@ -33,8 +32,7 @@ class Embedding(nn.Module):
     def __init__(self, image_size: int, patch_size: int, hidden_size: int):
         super().__init__()
         assert image_size
-        self.patch_embedding = PatchEmbedding(
-            patch_size, hidden_size=hidden_size)
+        self.patch_embedding = PatchEmbedding(patch_size, hidden_size=hidden_size)
         with torch.no_grad():
             img = torch.rand(1, 3, image_size, image_size)
             img = self.patch_embedding(img)
@@ -51,10 +49,8 @@ class Embedding(nn.Module):
 class FactorAttention(nn.Module):
     def __init__(self, hidden_size, heads):
         super().__init__()
-        self.v_attention = nn.MultiheadAttention(
-            hidden_size, heads, batch_first=True)
-        self.h_attention = nn.MultiheadAttention(
-            hidden_size, heads, batch_first=True)
+        self.v_attention = nn.MultiheadAttention(hidden_size, heads, batch_first=True)
+        self.h_attention = nn.MultiheadAttention(hidden_size, heads, batch_first=True)
 
     def forward(self, images):
         # Reshape to meet attention layer shape
@@ -99,8 +95,7 @@ class Stage(nn.Module):
         super().__init__()
         blocks = [Block(hidden_size, num_heads) for _ in range(num_blocks)]
         self.blocks = nn.Sequential(*blocks)
-        self.project = nn.Conv2d(
-            hidden_size, output_size, 3, stride=2, padding=1)
+        self.project = nn.Conv2d(hidden_size, output_size, 3, stride=2, padding=1)
 
     def forward(self, images):
         images = self.blocks(images)
