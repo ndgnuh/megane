@@ -24,7 +24,7 @@ email = "ndgnuh@protonmail.com"
 
 
 [tool.setuptools.package-dir]
-megane = "src"
+megane = "megane"
 
 [project.urls]
 "Homepage" = "https://github.com/ndgnuh/megane"

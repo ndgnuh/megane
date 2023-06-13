@@ -114,9 +114,8 @@ class PCViTBackbone(nn.Module):
             bc.num_attention_heads,
         )
         self.upscale = nn.Sequential(
-            nn.InstanceNorm2d(bc.output_size),
-            nn.Upsample(scale_factor=4),
-            nn.Conv2d(bc.output_size, bc.output_size, 3, padding=1)
+            UpscaleConv(bc.output_size),
+            UpscaleConv(bc.output_size),
         )
 
     def image2seq(self, x):

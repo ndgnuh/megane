@@ -1,33 +1,7 @@
 import math
-from typing import List
 
 import torch
 from torch import nn
-
-
-class DeConv(nn.Module):
-    def __init__(
-        self, in_channels, out_channels, kernel_size, stride=1, padding=0, groups=None
-    ):
-        super().__init__()
-        self.conv = nn.Conv2d(
-            in_channels,
-            in_channels * 4,
-            kernel_size,
-            stride=stride,
-            padding=padding,
-            groups=1,
-        )
-        self.out = nn.Conv2d(in_channels, out_channels, 1)
-
-    def forward(self, images):
-        N, C, H, W = images.shape
-        images = self.conv(images)
-        images = images.reshape(N, C, 2, 2, H, W)
-        images = images.transpose(4, 3)
-        images = images.reshape(N, C, H * 2, W * 2)
-        images = self.out(images)
-        return images
 
 
 class PatchEmbedding(nn.Module):
@@ -39,7 +13,8 @@ class PatchEmbedding(nn.Module):
         self.embeds = nn.ModuleList(
             [
                 nn.Sequential(
-                    nn.Conv2d(hidden_size, hidden_size, 2, stride=2),
+                    nn.Conv2d(hidden_size, hidden_size,
+                              3, stride=2, padding=1),
                     nn.InstanceNorm2d(hidden_size),
                     nn.ReLU(),
                 )
@@ -58,7 +33,8 @@ class Embedding(nn.Module):
     def __init__(self, image_size: int, patch_size: int, hidden_size: int):
         super().__init__()
         assert image_size
-        self.patch_embedding = PatchEmbedding(patch_size, hidden_size=hidden_size)
+        self.patch_embedding = PatchEmbedding(
+            patch_size, hidden_size=hidden_size)
         with torch.no_grad():
             img = torch.rand(1, 3, image_size, image_size)
             img = self.patch_embedding(img)
@@ -75,8 +51,10 @@ class Embedding(nn.Module):
 class FactorAttention(nn.Module):
     def __init__(self, hidden_size, heads):
         super().__init__()
-        self.v_attention = nn.MultiheadAttention(hidden_size, heads, batch_first=True)
-        self.h_attention = nn.MultiheadAttention(hidden_size, heads, batch_first=True)
+        self.v_attention = nn.MultiheadAttention(
+            hidden_size, heads, batch_first=True)
+        self.h_attention = nn.MultiheadAttention(
+            hidden_size, heads, batch_first=True)
 
     def forward(self, images):
         # Reshape to meet attention layer shape
@@ -121,7 +99,8 @@ class Stage(nn.Module):
         super().__init__()
         blocks = [Block(hidden_size, num_heads) for _ in range(num_blocks)]
         self.blocks = nn.Sequential(*blocks)
-        self.project = nn.Conv2d(hidden_size, output_size, 3, padding=1)
+        self.project = nn.Conv2d(
+            hidden_size, output_size, 3, stride=2, padding=1)
 
     def forward(self, images):
         images = self.blocks(images)
@@ -157,11 +136,24 @@ class InvPatchEmbedding(nn.Module):
         return self.output(patches)
 
 
+def output_sequence(image):
+    # n c h w -> n c (h w)
+    seq = image.flatten(-2)
+    # n c (h w) -> n (h w) c
+    seq = seq.transpose(-1, -2)
+    return seq
+
+
+def output_image(image):
+    return image
+
+
 class FViTBackbone(nn.Module):
     def __init__(self, config):
         super().__init__()
         assert config.image_size % 256 == 0
         assert config.backbone.patch_size % 4 == 0
+        assert config.backbone.output_format in ["seq", "image", "stages"]
         patch_size = config.backbone.patch_size
         num_blocks = config.backbone.num_blocks
         hidden_sizes = list(config.backbone.hidden_sizes)
@@ -189,32 +181,20 @@ class FViTBackbone(nn.Module):
             config.image_size, patch_size, hidden_size=hidden_sizes[0]
         )
         self.stages = nn.ModuleList(stages)
-        self.output = nn.Sequential(
-            *[
-                nn.Sequential(
-                    nn.UpsamplingNearest2d(scale_factor=2),
-                    nn.Conv2d(
-                        last_hidden // 2**i, last_hidden // 2 ** (i + 1),
-                        kernel_size=(3, 1),
-                        padding=(1, 0)
-                    ),
-                    nn.InstanceNorm2d(last_hidden // 2 ** (i + 1)),
-                    nn.ReLU(),
-                )
-                for i in range(num_stages)
-            ],
-            nn.Conv2d(
-                last_hidden // 2**num_stages,
-                last_hidden // 2**num_stages,
-                kernel_size=(3, 1),
-                padding=(1, 0),
-            ),
-        )
+        self.output_format = config.backbone.output_format
+        if self.output_format == "seq":
+            self.output = output_sequence
+        elif self.output_format == "image":
+            self.output = output_image
 
     def forward(self, images):
         patches = self.embedding(images)
         outputs = patches
+        stage_outputs = []
         for stage in self.stages:
             outputs = stage(outputs)
-        outputs = self.output(outputs)
-        return outputs
+            stage_outputs.append(outputs)
+        if self.output_format == "stages":
+            return stage_outputs
+        else:
+            return self.output(outputs)

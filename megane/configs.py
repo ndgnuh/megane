@@ -1,6 +1,8 @@
 from os import path
-from typing import List, Union, Dict, Optional
-from pydantic import BaseModel as _BaseModel, Field
+from typing import Dict, List, Optional, Union
+
+from pydantic import BaseModel as _BaseModel
+from pydantic import Field
 
 
 class BaseModel(_BaseModel):
@@ -68,6 +70,16 @@ class HeadConfig(BaseModel):
         return len(self.classes)
 
 
+class Seq2seqConfig(BaseModel):
+    classes: List[str]
+    head_size: int
+    num_max_objects: int
+
+    @property
+    def num_classes(self):
+        return len(self.classes)
+
+
 class FPNConfig(BaseModel):
     arch: str
     layers: List[str]
@@ -94,31 +106,36 @@ class PCViTConfig(BaseModel):
 
 class FViTConfig(BaseModel):
     patch_size: int
+    output_format: str
     num_blocks: List[int] = [3, 6, 3]
     hidden_sizes: List[int] = [32, 64, 128, 96]
     num_attention_heads: List[int] = [4, 8, 16]
 
     def get_output_size(self):
-        return self.hidden_size
+        return self.hidden_sizes[-1]
 
     @property
     def num_stages(self):
         return len(self.num_blocks)
 
 
+class FPNConcat(BaseModel):
+    output_size: int
+    num_upsamples: List[int]
+
+
 class ModelConfig(BaseModel):
+    classes: List[str]
     name: str
     image_size: int
-    head: Union[HeadConfig]
-    backbone: Union[FPNConfig, FViTConfig, PCViTConfig]
+    head: Dict
+    backbone: Dict
+    neck: Dict
 
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
 
     # Properties that must be provided by the model head configs
-    @property
-    def classes(self):
-        return self.head.classes
 
     # Properties that must be provided by the model backbone configs
     @property

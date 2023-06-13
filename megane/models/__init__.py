@@ -1,47 +1,53 @@
 from typing import *
 
-import torch
 import numpy as np
+import torch
+from torch import Tensor, nn, no_grad
 from torch.nn import functional as F
-from torch import nn, Tensor, no_grad
-from torchvision.models import mobilenet_v3_small, mobilenet_v3_large
+from torchvision.models import mobilenet_v3_large, mobilenet_v3_small
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.ops import FeaturePyramidNetwork
 from torchvision.transforms import functional as TF
 
+from .. import configs, utils
+from ..configs import (FPNConfig, FViTConfig, HeadConfig, ModelConfig,
+                       PCViTConfig, Seq2seqConfig)
 from ..data import Sample
-from .. import utils
-from ..configs import (
-    ModelConfig, FViTConfig, FPNConfig, PCViTConfig,
-    HeadConfig, Seq2seqConfig
-)
-from .head_dbbn import DBBNHead
-from .head_seq2seq import Seq2seq
+from .api import ModelAPI
 from .backbone_fpn import FPNBackbone
 from .backbone_fvit import FViTBackbone
 from .backbone_pcvit import PCViTBackbone
-from .api import ModelAPI
+from .head_dbbn import DBBNHead
+from .head_seq2seq import Seq2seq
+
+
+class backbones:
+    from .backbone_fpn_inception_spinoff import Network as fpn_spin
+
+    # from .backbone_fpn import FPNBackbone as fpn
+    # from .backbone_fvit import FViTBackbone as fvit
+
+
+class necks:
+    from .neck_fpnconcat import FPNConcat as fpn_concat
+    none = nn.Identity
+
+
+class heads:
+    from .head_segm import SegmentHead as segment
 
 
 class Model(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.image_size = config.image_size
-        self.hidden_size = config.hidden_size
 
-        if isinstance(config.backbone, FViTConfig):
-            self.backbone = FViTBackbone(config)
-        elif isinstance(config.backbone, FPNConfig):
-            self.backbone = FPNBackbone(config)
-        elif isinstance(config.backbone, PCViTConfig):
-            self.backbone = PCViTBackbone(config)
-        else:
-            raise ValueError(f"Unsupported backbone {config.backbone}")
+        # Backbone
+        self.backbone = utils.init_from_ns(backbones, config.backbone)
+        self.neck = utils.init_from_ns(necks, config.neck)
+        self.head = utils.init_from_ns(heads, config.head)
 
-        if isinstance(config.head, HeadConfig):
-            self.head: ModelAPI = DBBNHead(config)
-        if isinstance(config.head, Seq2seqConfig):
-            self.head: ModelAPI = Seq2seq(config)
+        # Ensure head is an ModelAPI compat
         assert isinstance(self.head, ModelAPI)
 
         # Delegation
@@ -53,6 +59,7 @@ class Model(nn.Module):
 
     def forward(self, images: Tensor, targets: Optional[Tensor] = None):
         features = self.backbone(images)
+        features = self.neck(features)
         outputs = self.head(features, targets)
         return outputs
 
@@ -71,5 +78,6 @@ class Model(nn.Module):
         else:
             self.train()
         for module in self.modules():
-            assert not hasattr(module, "infer") or isinstance(getattr(module, "infer"), bool)
+            assert not hasattr(module, "infer") or isinstance(
+                getattr(module, "infer"), bool)
             module.infer = infer

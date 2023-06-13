@@ -1,12 +1,12 @@
 import math
 from io import BytesIO
-from typing import Tuple
+from typing import Dict, Tuple
 
 import cv2
 import numpy as np
 from PIL import Image
 
-from .polygon import polygon_area, polygon_perimeter, offset_polygon
+from .polygon import offset_polygon, polygon_area, polygon_perimeter
 
 
 def bytes2pillow(bs: bytes) -> Image:
@@ -351,9 +351,30 @@ def polygon2xyxy(polygon):
     ymax = max(y for x, y in polygon)
     return xmin, ymin, xmax, ymax
 
+
 def xyxy2polygon(xyxy):
     xmin, ymin, xmax, ymax = xyxy
     return [(xmin, ymin),
             (xmax, ymin),
             (xmax, ymax),
             (xmin, ymax)]
+
+
+def init_from_ns(ns, config: Dict):
+    """Helper function that takes a namespace and a dictionary
+    to initialize an instance.
+
+    Args:
+        ns:
+            A namespace of any type, must support `getattr`.
+        config:
+            A dict with the keyword arguments.
+            Must contain the `type` key.
+            The `type` is the reflection key to determine the
+            type name in the specified namespace.
+
+    Returns:
+        The initialized instance.
+    """
+    kind = config.pop("type")
+    return getattr(ns, kind)(**config)
