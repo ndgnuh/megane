@@ -8,3 +8,4 @@ disable=
 	c-extension-no-member,
 	too-many-locals,
 	duplicate-code,
+	no-member,
