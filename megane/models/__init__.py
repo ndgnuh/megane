@@ -29,19 +29,22 @@ from .head_seq2seq import Seq2seq
 
 class backbones:
     from .backbone_fpn_inception_spinoff import Network as fpn_spin
+    from .backbone_fpn_resnet import resnet_18, resnet_34, resnet_tiny
 
     # from .backbone_fpn import FPNBackbone as fpn
     # from .backbone_fvit import FViTBackbone as fvit
 
 
 class necks:
-    from .neck_fpnconcat import FPNConcat as fpn_concat
+    from megane.models.neck_dbnet import NeckDBNet as dbnet
+    from megane.models.neck_fpnconcat import FPNConcat as fpn_concat
 
     none = nn.Identity
 
 
 class heads:
-    from .head_segm import SegmentHead as segment
+    from megane.models.head_dbnet import DBNetHead as dbnet
+    from megane.models.head_segm import SegmentHead as segment
 
 
 class Model(nn.Module):
@@ -62,9 +65,10 @@ class Model(nn.Module):
         self.decode_sample = self.head.decode_sample
         self.compute_loss = self.head.compute_loss
         self.collate_fn = self.head.collate_fn
+        self.visualize_outputs = self.head.visualize_outputs
         self.set_infer(False)
 
-    def forward(self, images: Tensor, targets: Optional[Tensor] = None):
+    def forward(self, images: Tensor, targets: Tensor | None = None):
         features = self.backbone(images)
         features = self.neck(features)
         outputs = self.head(features, targets)

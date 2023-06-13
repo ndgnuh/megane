@@ -101,3 +101,21 @@ class ResNet(nn.Module):
             x = stage(x)
             outputs.append(project(x))
         return outputs
+
+
+def resnet_18(project_size: int | None = None):
+    hidden_sizes = [64, 128, 256, 512]
+    num_layers = [2, 2, 2, 2]
+    return ResNet(hidden_sizes, num_layers, project_size)
+
+
+def resnet_34(project_size: int | None = None):
+    hidden_sizes = [64, 128, 256, 512]
+    num_layers = [3, 4, 6, 3]
+    return ResNet(hidden_sizes, num_layers, project_size)
+
+
+def resnet_tiny(project_size: int | None = None):
+    hidden_sizes = [48, 96, 128, 256]
+    num_layers = [2, 2, 2, 2]
+    return ResNet(hidden_sizes, num_layers, project_size)
