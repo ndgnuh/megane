@@ -1,21 +1,21 @@
-import traceback
 import random
-from os import path, makedirs
+import traceback
 from datetime import datetime
+from os import makedirs, path
 
-import torch
 import numpy as np
-from torch import optim, Tensor
+import torch
+from lightning import Fabric
+from tensorboardX import SummaryWriter
+from torch import Tensor, optim
 from torch.utils.data import DataLoader
 from torchvision.transforms import functional as TF
 from tqdm import tqdm
-from lightning import Fabric
-from tensorboardX import SummaryWriter
 
-from .models import Model, ModelAPI
+from .configs import ModelConfig, TrainConfig
 from .data import TextDetectionDataset
 from .meanap import compute_maf1
-from .configs import TrainConfig, ModelConfig
+from .models import Model, ModelAPI
 
 
 def loop_loader(loader, total_steps: int):
@@ -135,11 +135,17 @@ class Trainer:
                 )
                 logger.add_image("train/sample-pr", pr_sample.visualize_tensor(), step)
                 logger.add_image("train/sample-gt", gt_sample.visualize_tensor(), step)
-                logger.add_image(
-                    "train/outputs-pr", model.head.visualize_outputs(outputs), step
+                model.visualize_outputs(
+                    outputs,
+                    logger=logger,
+                    tag="train/outputs-pr",
+                    step=step,
                 )
-                logger.add_image(
-                    "train/outputs-gt", model.head.visualize_outputs(targets), step
+                model.visualize_outputs(
+                    targets,
+                    logger=logger,
+                    tag="train/outputs-gt",
+                    step=step,
                 )
                 logger.flush()
 
@@ -210,11 +216,17 @@ class Trainer:
         logger.add_image(
             "validate/sample-gt", ground_truths[idx].visualize_tensor(), step
         )
-        logger.add_image(
-            "validate/outputs-pr", model.head.visualize_outputs(raw_outputs[idx]), step
+        model.visualize_outputs(
+            raw_outputs[idx],
+            logger=logger,
+            tag="validate/outputs-pr",
+            step=step,
         )
-        logger.add_image(
-            "validate/outputs-gt", model.head.visualize_outputs(raw_targets[idx]), step
+        model.visualize_outputs(
+            raw_targets[idx],
+            logger=logger,
+            tag="validate/outputs-gt",
+            step=step,
         )
 
         # Metric
