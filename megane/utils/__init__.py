@@ -6,6 +6,7 @@ from PIL import Image
 
 from megane.utils.masks import *
 from megane.utils.meanap import *
+from megane.utils.misc import *
 from megane.utils.polygons import *
 
 try:

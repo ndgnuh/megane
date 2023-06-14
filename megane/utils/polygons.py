@@ -1,5 +1,7 @@
 from typing import List, Tuple
 
+from megane.utils.misc import with_batch_mode
+
 
 def normalize_polygon(polygon, width, height, batch=False):
     """
@@ -60,6 +62,7 @@ def denormalize_polygon(polygon, width, height, batch=False):
     return [(int(x * width), int(y * height)) for x, y in polygon]
 
 
+@with_batch_mode
 def polygon_area(poly: List[Tuple[float, float]]):
     """Calculate area of a polygon.
 
@@ -81,6 +84,7 @@ def polygon_area(poly: List[Tuple[float, float]]):
     return area
 
 
+@with_batch_mode
 def polygon_perimeter(poly: List[Tuple[float, float]]):
     """Calculate the perimeter of a polygon.
 
@@ -101,6 +105,7 @@ def polygon_perimeter(poly: List[Tuple[float, float]]):
     return peri
 
 
+@with_batch_mode
 def offset_polygon(poly: List[Tuple[float, float]], offset: float):
     """Offset the polygon by a some value.
     Negative offset shrink the polygon. Positive offset expand the polygon.
