@@ -105,6 +105,7 @@ def load_sample_labelme(sample_path, classes):
         else:
             continue
 
+        assert shape["label"] in classes, f"Unknown class {shape['label']}"
         class_idx = classes.index(shape["label"])
         class_indices.append(class_idx)
 
