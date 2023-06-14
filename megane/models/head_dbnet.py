@@ -386,9 +386,34 @@ class DBNetHeadForDetection(DBNetFamily):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
 
+        # Loss function
+        if self.num_classes == 1:
+            loss_fn = F.binary_cross_entropy_with_logits
+        else:
+            loss_fn = F.multi_label_margin_loss
+
+        # Prepare
         pr = torch.cat([pr_probas, pr_thresholds], dim=1)
         gt = torch.cat([gt_probas, gt_thresholds], dim=1)
-        return F.cross_entropy(pr, gt)
+        loss = loss_fn(pr, gt)
+
+        # Additional loss between the threshold and the proba
+        count = 0
+        extra_loss = 0
+        for i in range(self.num_classes):
+            pr_proba = pr_probas[:, i + 1]
+            pr_threshold = pr_thresholds[:, i]
+            gt_proba = gt_probas[:, i + 1]
+            gt_threshold = gt_thresholds[:, i]
+            pr_bg = torch.clamp(1 - pr_threshold - pr_proba, 0, 1)
+            gt_bg = torch.clamp(1 - gt_threshold - gt_proba, 0, 1)
+            pr = torch.stack([pr_bg, pr_threshold, pr_proba], dim=1)
+            gt = torch.stack([gt_bg, gt_threshold, gt_proba], dim=1)
+            extra_loss = extra_loss + F.cross_entropy(pr, gt)
+            count = count + 1
+
+        loss = loss + extra_loss / count
+        return loss
 
     def encode_sample(self, sample: Sample):
         sz = self.image_size
