@@ -29,7 +29,13 @@ from .head_seq2seq import Seq2seq
 
 class backbones:
     from .backbone_fpn_inception_spinoff import Network as fpn_spin
-    from .backbone_fpn_resnet import resnet_18, resnet_34, resnet_tiny
+    from .backbone_fpn_resnet import (
+        resnet_18,
+        resnet_34,
+        resnet_50,
+        resnet_tiny_26,
+        resnet_tiny_50,
+    )
 
     # from .backbone_fpn import FPNBackbone as fpn
     # from .backbone_fvit import FViTBackbone as fvit
@@ -44,6 +50,7 @@ class necks:
 
 class heads:
     from megane.models.head_dbnet import DBNetHead as dbnet
+    from megane.models.head_dbnet import HeadSegment as dbnet_v2
     from megane.models.head_segm import SegmentHead as segment
 
 
