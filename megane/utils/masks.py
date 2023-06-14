@@ -1,7 +1,50 @@
 import math
+from typing import List
 
 import cv2
 import numpy as np
+
+
+def draw_threshold_mask(
+    width: int,
+    height: int,
+    inner_polygons: List,
+    outer_polygons: List,
+):
+    """
+    Draws a threshold mask based on the provided inner and outer polygons.
+
+    Args:
+        width (int):
+            The width of the mask.
+        height (int):
+            The height of the mask.
+        inner_polygons (List):
+            A list of inner polygons represented as a list of vertices.
+        outer_polygons (List):
+            A list of outer polygons represented as a list of vertices.
+
+    Returns:
+        np.ndarray:
+            The generated threshold mask as a numpy array.
+
+    Example:
+        inner_polygons = [[[0, 0], [0, 5], [5, 5], [5, 0]]]
+        outer_polygons = [[[0, 0], [0, 10], [10, 10], [10, 0]]]
+        mask = draw_threshold_mask(10, 10, inner_polygons, outer_polygons)
+    """
+    mask = np.zeros((height, width), dtype="float32")
+    for inner_box, outer_box in zip(inner_polygons, outer_polygons):
+        # Draw to a canvas first
+        # and then fill the inner box with background
+        canvas = np.zeros_like(mask)
+        canvas = cv2.fillConvexPoly(canvas, outer_box, 1)
+        canvas = cv2.fillConvexPoly(canvas, inner_box, 0)
+        # yank the canvas to the threshold map
+        mask = mask + canvas
+    # Normalize threshold map to 0..1
+    mask = np.clip(mask, 0, 1)
+    return mask
 
 
 def draw_mask(width: int, height: int, polygons: np.ndarray):

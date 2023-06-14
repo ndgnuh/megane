@@ -1,6 +1,65 @@
 from typing import List, Tuple
 
 
+def normalize_polygon(polygon, width, height, batch=False):
+    """
+    Normalizes a polygon by scaling its coordinates to the range [0, 1].
+
+    Args:
+        polygon (list):
+            The polygon to be normalized, represented as a list of vertices.
+        width (int):
+            The width of the bounding box containing the polygon.
+        height (int):
+            The height of the bounding box containing the polygon.
+        batch (bool, optional):
+            Specifies whether the input is a batch of polygons.
+            Defaults to False.
+
+    Returns:
+        list:
+            The normalized polygon, represented as a list of vertices.
+            If batch is specified, the list contain multiple polygons.
+
+    Example:
+        polygon = [(10, 20), (30, 40), (50, 60)]
+        normalized_polygon = normalize_polygon(polygon, 100, 200)
+    """
+    if batch:
+        return [normalize_polygon(p, width, height) for p in polygon]
+    return [(x / width, y / height) for x, y in polygon]
+
+
+def denormalize_polygon(polygon, width, height, batch=False):
+    """
+    Denormalizes a polygon by scaling its coordinates from the range [0, 1]
+    to the original width and height.
+
+    Args:
+        polygon (list):
+            The polygon to be denormalized, represented as a list of vertices.
+        width (int):
+            The original width of the bounding box containing the polygon.
+        height (int):
+            The original height of the bounding box containing the polygon.
+        batch (bool, optional):
+            Specifies whether the polygon is part of a batch.
+            Defaults to False.
+
+    Returns:
+        list:
+            The normalized polygon, represented as a list of vertices.
+            If batch is specified, the list contain multiple polygons.
+
+    Example:
+        polygon = [(0.2, 0.4), (0.6, 0.8), (1.0, 1.2)]
+        denormalized_polygon = denormalize_polygon(polygon, 100, 200)
+    """
+    if batch:
+        return [denormalize_polygon(p, width, height) for p in polygon]
+    return [(int(x * width), int(y * height)) for x, y in polygon]
+
+
 def polygon_area(poly: List[Tuple[float, float]]):
     """Calculate area of a polygon.
 
