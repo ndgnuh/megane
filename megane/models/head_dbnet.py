@@ -449,15 +449,12 @@ class DBNetHeadForDetection(DBNetFamily):
         ground_truth: bool = False,
     ):
         probas, thresholds = outputs
-        try:
-            images = torch.cat([probas, thresholds], dim=-3).cpu()
-            if not ground_truth:
-                images = torch.sigmoid(images)
+        images = torch.cat([probas, thresholds], dim=-3).cpu()
+        if not ground_truth:
+            images = torch.sigmoid(images)
 
-            images = utils.stack_image_batch(images)
-            logger.add_image(tag, images, step)
-        except Exception:
-            print(probas.shape, thresholds.shape)
+        images = utils.stack_image_batch(images)
+        logger.add_image(tag, images, step)
 
     @torch.no_grad()
     def decode_sample(self, inputs, outputs, ground_truth: bool = False):

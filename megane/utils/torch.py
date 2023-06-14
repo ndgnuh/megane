@@ -14,6 +14,8 @@ def stack_image_batch(images: Tensor):
         stacked:
             Torch tensor of shape 1 (N H) (C W)
     """
+    if images.ndim == 3:
+        images = images.unsqueeze(0)
     images = torch.cat([image for image in images], dim=-2)
     images = torch.cat([image for image in images], dim=-1)
     images = images.unsqueeze(0)
