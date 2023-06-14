@@ -138,7 +138,7 @@ class DBNetFamily(api.ModelAPI):
         final_scores = []
         for class_idx, mask in enumerate(probas):
             mask_size = self.image_size
-            boxes, scores = utils.mask_to_polygon(mask.numpy())
+            boxes, scores = utils.mask_to_rrect(mask.numpy())
             for polygon, score in zip(boxes, scores):
                 # Filter bounding boxes
                 if score < 0.5:
@@ -149,9 +149,10 @@ class DBNetFamily(api.ModelAPI):
                     continue
 
                 # Expand detected polygon
-                d = area * 1.5 / length
-                polygon = utils.offset_polygon(polygon, d)
-                polygon = np.clip(polygon, 0, mask_size)
+                if self.expand_rate > 0:
+                    d = area * self.expand_rate / length
+                    polygon = utils.offset_polygon(polygon, d)
+                    polygon = np.clip(polygon, 0, mask_size)
                 polygon = [(x / mask_size, y / mask_size) for (x, y) in polygon]
 
                 # Append result
@@ -223,9 +224,24 @@ class DBNetHead(DBNetFamily):
         else:
             return x
 
+    def hnm(self, batch_losses, masks, k=3):
+        loss = 0
+        for losses, positives in zip(batch_losses, masks):
+            negatives = ~positives
+            num_positives = torch.count_nonzero(positives)
+            num_negatives = torch.count_nonzero(negatives)
+            num_negatives = torch.minimum(num_positives * k, num_negatives)
+            loss = (
+                loss
+                + losses[positives].sort(descending=True).values[:num_positives].mean()
+                + losses[negatives].sort(descending=True).values[:num_negatives].mean()
+            )
+        return loss / losses.shape[0]
+
     def compute_loss(self, outputs, targets):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
+        # training_mask = (gt_probas + gt_thresholds) > 0
 
         # Loss functions
         bce_logits = F.binary_cross_entropy_with_logits
@@ -237,6 +253,7 @@ class DBNetHead(DBNetFamily):
 
         # Proba map loss
         loss_proba = bce_logits(pr_probas, gt_probas * 1.0)
+        loss_proba = F.l1_loss(torch.sigmoid(pr_probas), gt_probas * 1.0) + loss_proba
 
         # Threshold map loss
         loss_threshold = F.l1_loss(pr_thresholds, gt_thresholds * 1.0)
@@ -334,3 +351,112 @@ class HeadSegment(DBNetFamily):
         outputs = utils.stack_image_batch(outputs)
 
         logger.add_image(tag, outputs, step)
+
+
+class DBNetHeadForDetection(DBNetFamily):
+    def __init__(
+        self,
+        image_size: int,
+        hidden_size: int,
+        num_classes: int,
+        expand_rate: float = 0.4,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.num_classes = num_classes
+        self.image_size = image_size
+        # Rewire the decode function
+        self.shrink_rate = expand_rate
+        self.expand_rate = 0
+        # 0 = background
+        self.probas = PredictionConv(hidden_size, num_classes + 1)
+        # 0 = threshold
+        self.thresholds = PredictionConv(hidden_size, num_classes)
+
+    def forward(self, features, targets=None):
+        probas = self.probas(features)
+        if self.infer:
+            thresholds = None
+        else:
+            thresholds = self.thresholds(features)
+        return (probas, thresholds)
+
+    def compute_loss(self, outputs, targets):
+        pr_probas, pr_thresholds = outputs
+        gt_probas, gt_thresholds = targets
+
+        N, _, H, W = pr_probas.shape
+        gt_backgrounds = 1 - torch.clamp(gt_probas + gt_thresholds, 0, 1).sum(
+            dim=1, keepdim=True
+        )
+
+        pr = torch.cat([pr_probas, pr_thresholds], dim=1)
+        gt = torch.cat([gt_backgrounds, gt_probas, gt_thresholds], dim=1)
+        return F.cross_entropy(pr, gt)
+
+    def encode_sample(self, sample: Sample):
+        sz = self.image_size
+        num_classes = self.num_classes
+        r = self.shrink_rate
+
+        # Process inputs
+        image = utils.prepare_input(sample.image, sz, sz)
+
+        # Process targets
+        # Expand polygons
+        boxes = utils.denormalize_polygon(sample.boxes, sz, sz, batch=True)
+        areas = map(utils.polygon_area, boxes)
+        lengths = map(utils.polygon_perimeter, boxes)
+        dists = [(1 - r**2) * A / L for A, L in zip(areas, lengths)]
+        expand_boxes = starmap(utils.offset_polygon, zip(boxes, dists))
+
+        # Helper function to filter boxes
+        def filter_boxes(orig_boxes, class_idx):
+            return [
+                np.array(box).astype(int)
+                for (box, class_idx_) in zip(orig_boxes, sample.classes)
+                if class_idx == class_idx_
+            ]
+
+        # Draw target masks
+        probas = []
+        thresholds = []
+        for class_idx in range(num_classes):
+            # Filter boxes by class
+            expand_boxes_c = filter_boxes(expand_boxes, class_idx)
+            boxes_c = filter_boxes(boxes, class_idx)
+            proba = utils.draw_mask(sz, sz, boxes_c)
+            thresh = utils.draw_mask(sz, sz, expand_boxes_c)
+            thresh = np.clip(thresh - proba, 0, 1)
+
+            # Add result
+            probas.append(proba)
+            thresholds.append(thresh)
+
+        # Stack
+        probas = np.stack(probas, axis=0)
+        thresholds = np.stack(thresholds, axis=0)
+
+        return image, (probas, thresholds)
+
+    @torch.no_grad()
+    def visualize_outputs(
+        self,
+        outputs,
+        logger,
+        tag,
+        step,
+        ground_truth: bool = False,
+    ):
+        probas, thresholds = outputs
+        probas = probas[0].unsqueeze(0)
+        thresholds = thresholds[0].unsqueeze(0)
+        if not ground_truth:
+            probas = torch.sigmoid(probas)
+            thresholds = torch.sigmoid(thresholds)
+
+        probas = utils.stack_image_batch(probas)
+        thresholds = utils.stack_image_batch(thresholds)
+        images = torch.cat([probas, thresholds], dim=-1)
+
+        logger.add_image(tag, images, step)

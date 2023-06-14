@@ -5,6 +5,39 @@ import cv2
 import numpy as np
 
 
+def find_score(mask, polygon):
+    """Calculates the score by computing the intersection between
+    a binary mask and a polygon.
+
+    The function fills the polygon with ones in a raster image and performs
+    element-wise multiplication between the mask and the raster to obtain
+    the intersection. The score is then calculated as the sum of the
+    intersection divided by the count of non-zero elements in the intersection.
+
+    Args:
+        mask:
+            Score mask
+        polygon:
+            An array representing the vertices of the polygon.
+
+    Returns:
+        The score.
+
+    Example:
+        >>> mask = np.array([[0, 1, 1],
+        ...                  [0, 1, 0],
+        ...                  [1, 0, 1]], dtype=np.uint8)
+        >>> polygon = np.array([[1, 0],
+        ...                     [2, 0],
+        ...                     [2, 1]], dtype=np.float32)
+        >>> score = find_score(mask, polygon)
+    """
+    raster = np.zeros_like(mask, dtype="float32")
+    raster = cv2.fillConvexPoly(raster, polygon.astype(int), 1)
+    scores = mask * raster
+    return scores.sum() / np.count_nonzero(scores)
+
+
 def draw_threshold_mask(
     width: int,
     height: int,
@@ -68,8 +101,8 @@ def draw_mask(width: int, height: int, polygons: np.ndarray):
     return mask
 
 
-def mask_to_polygon(mask, open_kernel=None):
-    """Convert from binary mask to box points polygon
+def mask_to_rrect(mask, open_kernel=None):
+    """Convert from binary mask to rotated rectangles
 
     Args:
         mask:
@@ -91,12 +124,6 @@ def mask_to_polygon(mask, open_kernel=None):
     bin_mask = (bin_mask * 255).astype("uint8")
     cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-    def find_score(polygon):
-        raster = np.zeros_like(mask, dtype="float32")
-        raster = cv2.fillConvexPoly(raster, polygon.astype(int), 1)
-        scores = mask * raster
-        return scores.sum() / np.count_nonzero(scores)
-
     def should_square(rect):
         (x, y), (w, h), a = rect
         a = abs(a) % 90
@@ -112,11 +139,45 @@ def mask_to_polygon(mask, open_kernel=None):
         if h == 0 or w == 0:
             continue
         polygon = cv2.boxPoints(rect)
-        score = find_score(polygon)
+        score = find_score(mask, polygon)
         if should_square(rect):
             xmin, ymin = np.min(polygon, axis=-2)
             xmax, ymax = np.max(polygon, axis=-2)
             polygon = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+        polygons.append(polygon)
+        scores.append(score)
+    return polygons, scores
+
+
+def mask_to_polygons(mask, open_kernel=None):
+    """Convert from binary mask to rotated rectangles
+
+    Args:
+        mask:
+            2D numpy array, value in range 0, 1
+
+    Returns:
+        polygons:
+            List of polygons.
+        scores:
+            Polygon scores based on the input mask.
+    """
+    height, width = mask.shape
+    bin_mask = mask > 0
+    bin_mask = (bin_mask * 255).astype("uint8")
+    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    polygons = []
+    scores = []
+    for cnt in cnts:
+        rect = cv2.minAreaRect(cnt)
+        (x, y), (w, h), a = rect
+        if h == 0 or w == 0:
+            continue
+
+        eps = min(w, h) * 0.1
+        polygon = cv2.approxPolyDP(rect, eps)
+        score = find_score(mask, polygon)
         polygons.append(polygon)
         scores.append(score)
     return polygons, scores

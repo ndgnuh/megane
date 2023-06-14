@@ -26,6 +26,7 @@ class necks:
 
 class heads:
     from megane.models.head_dbnet import DBNetHead as dbnet
+    from megane.models.head_dbnet import DBNetHeadForDetection as dbnet_sparse
     from megane.models.head_dbnet import HeadSegment as dbnet_v2
     from megane.models.head_segm import SegmentHead as segment
 
