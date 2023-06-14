@@ -121,15 +121,15 @@ class Augmentation:
                     p=p,
                 ),
                 # Affine transform
-                # A.Affine(
-                #     rotate=(-10, 10),
-                #     shear=(-10, 10),
-                #     scale=(0.8, 1.2),
-                #     translate_percent=(-0.1, 0.1),
-                #     p=p,
-                # ),
+                A.Affine(
+                    rotate=(-10, 10),
+                    shear=(-10, 10),
+                    scale=(0.8, 1.2),
+                    translate_percent=(-0.1, 0.1),
+                    p=p,
+                ),
             ],
-            keypoint_params=A.KeypointParams(format="xy"),
+            keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
         )
 
     def __call__(self, sample: Sample) -> Sample:
