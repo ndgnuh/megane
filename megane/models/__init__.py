@@ -5,8 +5,7 @@ from megane.models.api import ModelAPI
 
 
 class backbones:
-    from .backbone_fpn_inception_spinoff import Network as fpn_spin
-    from .backbone_fpn_resnet import (
+    from megane.models.backbone_fpn_resnet import (
         resnet_18,
         resnet_34,
         resnet_50,
