@@ -2,6 +2,7 @@ from itertools import starmap
 
 # Reference: https://arxiv.org/abs/1911.08947
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
@@ -385,13 +386,8 @@ class DBNetHeadForDetection(DBNetFamily):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
 
-        N, _, H, W = pr_probas.shape
-        gt_backgrounds = 1 - torch.clamp(gt_probas + gt_thresholds, 0, 1).sum(
-            dim=1, keepdim=True
-        )
-
         pr = torch.cat([pr_probas, pr_thresholds], dim=1)
-        gt = torch.cat([gt_backgrounds, gt_probas, gt_thresholds], dim=1)
+        gt = torch.cat([gt_probas, gt_thresholds], dim=1)
         return F.cross_entropy(pr, gt)
 
     def encode_sample(self, sample: Sample):
@@ -437,6 +433,10 @@ class DBNetHeadForDetection(DBNetFamily):
         probas = np.stack(probas, axis=0)
         thresholds = np.stack(thresholds, axis=0)
 
+        # Make backgrounds
+        backgrounds = 1 - np.clip(probas.sum(axis=0), 0, 1)
+        probas = np.concatenate([backgrounds[None, ...], probas], axis=0)
+
         return image, (probas, thresholds)
 
     @torch.no_grad()
@@ -449,14 +449,49 @@ class DBNetHeadForDetection(DBNetFamily):
         ground_truth: bool = False,
     ):
         probas, thresholds = outputs
-        probas = probas[0].unsqueeze(0)
-        thresholds = thresholds[0].unsqueeze(0)
+        try:
+            images = torch.cat([probas, thresholds], dim=-3).cpu()
+            if not ground_truth:
+                images = torch.sigmoid(images)
+
+            images = utils.stack_image_batch(images)
+            logger.add_image(tag, images, step)
+        except Exception:
+            print(probas.shape, thresholds.shape)
+
+    @torch.no_grad()
+    def decode_sample(self, inputs, outputs, ground_truth: bool = False):
+        image = TF.to_pil_image(inputs.detach().cpu())
+
+        # post process
+        outputs = outputs[0].detach().cpu()
         if not ground_truth:
-            probas = torch.sigmoid(probas)
-            thresholds = torch.sigmoid(thresholds)
+            outputs = torch.softmax(outputs, dim=-3)
 
-        probas = utils.stack_image_batch(probas)
-        thresholds = utils.stack_image_batch(thresholds)
-        images = torch.cat([probas, thresholds], dim=-1)
+        masks, classes = outputs.max(dim=-3)
 
-        logger.add_image(tag, images, step)
+        #  adapt
+        masks = masks.numpy()
+        classes = classes.numpy()
+
+        # decode
+        final_classes = []
+        final_scores = []
+        final_polygons = []
+        for class_idx in range(self.num_classes):
+            class_mask = classes == (class_idx + 1)
+            mask = masks * class_mask
+            polygons, scores = utils.mask_to_polygons(mask)
+
+            final_polygons.extend(polygons)
+            final_classes.extend([class_idx] * len(polygons))
+            final_scores.extend(scores)
+
+        # output sample
+        sample = Sample(
+            image=image,
+            boxes=final_polygons,
+            scores=final_scores,
+            classes=final_classes,
+        )
+        return sample

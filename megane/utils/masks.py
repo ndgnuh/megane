@@ -149,7 +149,7 @@ def mask_to_rrect(mask, open_kernel=None):
     return polygons, scores
 
 
-def mask_to_polygons(mask, open_kernel=None):
+def mask_to_polygons(mask):
     """Convert from binary mask to rotated rectangles
 
     Args:
@@ -176,8 +176,10 @@ def mask_to_polygons(mask, open_kernel=None):
             continue
 
         eps = min(w, h) * 0.1
-        polygon = cv2.approxPolyDP(rect, eps)
+        polygon = cv2.approxPolyDP(cnt, eps, closed=True)
+        polygon = polygon[:, 0, :]
         score = find_score(mask, polygon)
+        polygon = [(x / width, y / height) for (x, y) in polygon]
         polygons.append(polygon)
         scores.append(score)
     return polygons, scores
