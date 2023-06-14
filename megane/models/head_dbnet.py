@@ -1,3 +1,5 @@
+from itertools import starmap
+
 # Reference: https://arxiv.org/abs/1911.08947
 import cv2
 import numpy as np
@@ -25,29 +27,20 @@ def encode_sample(
     )
 
     # De-normalize boxes
-    boxes = [
-        [(x * image_size, y * image_size) for (x, y) in polygon]
-        for polygon in sample.boxes
-    ]
+    boxes = utils.denormalize_polygon(
+        sample.boxes,
+        image_size,
+        image_size,
+        batch=True,
+    )
 
     # Calculate offset boxes
-    areas = [utils.polygon_area(poly) for poly in boxes]
-    lengths = [utils.polygon_perimeter(poly) for poly in boxes]
-    dists = [(1 - shrink_rate**2) * A / L for (A, L) in zip(areas, lengths)]
-    expand_boxes = [
-        utils.offset_polygon(
-            box,
-            distance,
-        )
-        for (box, distance) in zip(boxes, dists)
-    ]
-    shrink_boxes = [
-        utils.offset_polygon(
-            box,
-            -distance,
-        )
-        for (box, distance) in zip(boxes, dists)
-    ]
+    areas = map(utils.polygon_area, boxes)
+    lengths = map(utils.polygon_perimeter, boxes)
+    dists = [(1 - shrink_rate**2) * A / L for A, L in zip(areas, lengths)]
+    expand_boxes = starmap(utils.offset_polygon, zip(boxes, dists))
+    dists = map(lambda x: -x, dists)
+    shrink_boxes = starmap(utils.offset_polygon, zip(boxes, dists))
 
     # Helper function to filter boxes
     def filter_boxes(orig_boxes, class_idx):
@@ -66,22 +59,13 @@ def encode_sample(
         expand_boxes_c = filter_boxes(expand_boxes, class_idx)
 
         # Draw probability mask
-        proba_map = np.zeros((image_size, image_size), dtype="float32")
-        for box in shrink_boxes_c:
-            cv2.fillConvexPoly(proba_map, box, 1)
+        proba_map = utils.draw_mask(image_size, image_size, shrink_boxes_c)
+        proba_map = np.clip(proba_map, 0, 1)
         probas.append(proba_map)
 
         # Draw threshold masks
-        threshold_map = np.zeros((image_size, image_size), dtype="float32")
-        for inner_box, outer_box in zip(shrink_boxes_c, expand_boxes_c):
-            # Draw to a canvas first
-            # and then fill the inner box with background
-            canvas = np.zeros_like(threshold_map)
-            canvas = cv2.fillConvexPoly(canvas, outer_box, 1)
-            canvas = cv2.fillConvexPoly(canvas, inner_box, 0)
-            # yank the canvas to the threshold map
-            threshold_map = threshold_map + canvas
-        # Normalize threshold map to 0..1
+        threshold_map = utils.draw_mask(image_size, image_size, expand_boxes_c)
+        threshold_map = threshold_map - proba_map
         threshold_map = np.clip(threshold_map, 0, 1)
         thresholds.append(threshold_map)
 
@@ -97,31 +81,15 @@ def SimpleFilter(channels):
 
 
 def PredictionConv(hidden_size, num_classes: int = 1):
-    aux_size_1 = hidden_size // 4
-    aux_size_2 = hidden_size // 8
+    aux_size = hidden_size // 4
     return nn.Sequential(
-        nn.Conv2d(hidden_size, aux_size_1, 3, bias=False, padding=1),
-        nn.InstanceNorm2d(aux_size_1),
-        nn.ReLU(inplace=True),
-        nn.ConvTranspose2d(
-            aux_size_1,
-            aux_size_2,
-            kernel_size=2,
-            stride=2,
-            bias=False,
-        ),
-        nn.InstanceNorm2d(aux_size_2),
-        nn.ReLU(inplace=True),
-        nn.ConvTranspose2d(
-            aux_size_2,
-            out_channels=num_classes,
-            kernel_size=2,
-            stride=2,
-            bias=False,
-        ),
-        SimpleFilter(num_classes),
-        SimpleFilter(num_classes),
-        SimpleFilter(num_classes),
+        nn.Conv2d(hidden_size, aux_size, 3, padding=1),
+        nn.InstanceNorm2d(aux_size),
+        nn.ReLU(),
+        nn.ConvTranspose2d(aux_size, aux_size, kernel_size=2, stride=2),
+        nn.InstanceNorm2d(aux_size),
+        nn.ReLU(),
+        nn.ConvTranspose2d(aux_size, num_classes, kernel_size=2, stride=2),
     )
 
 
@@ -136,9 +104,67 @@ class DBNetFamily(api.ModelAPI):
             num_classes=self.num_classes,
         )
 
-    def decode_sample(self, inputs, outputs, ground_truth=False):
+    @torch.no_grad()
+    def decode_sample(
+        self,
+        inputs,
+        outputs,
+        ground_truth: bool = False,
+    ) -> Sample:
+        """Return a sample from raw model outputs
+        Args:
+            inputs:
+                Model encoded input image of shape [3, H, W]
+            outputs:
+                Tuple of proba map and threshold map
+            sample:
+                The input sample, this is only used to get the image.
+            ground_truth:
+                Specify if this is decoded from the ground truth
+
+        Returns:
+            The decoded sample.
+        """
         image = TF.to_pil_image(inputs)
-        return Sample(image=image)
+        probas = outputs[0].detach().cpu()
+
+        # Mask to polygons
+        if not ground_truth:
+            probas = torch.sigmoid(probas)
+
+        # For each classes
+        final_classes = []
+        final_polygons = []
+        final_scores = []
+        for class_idx, mask in enumerate(probas):
+            mask_size = self.image_size
+            boxes, scores = utils.mask_to_polygon(mask.numpy())
+            for polygon, score in zip(boxes, scores):
+                # Filter bounding boxes
+                if score < 0.5:
+                    continue
+                area = utils.polygon_area(polygon)
+                length = utils.polygon_perimeter(polygon)
+                if length == 0 or area == 0:
+                    continue
+
+                # Expand detected polygon
+                d = area * 1.5 / length
+                polygon = utils.offset_polygon(polygon, d)
+                polygon = np.clip(polygon, 0, mask_size)
+                polygon = [(x / mask_size, y / mask_size) for (x, y) in polygon]
+
+                # Append result
+                final_polygons.append(polygon)
+                final_scores.append(score)
+                final_classes.append(class_idx)
+
+        return Sample(
+            image=image,
+            boxes=final_polygons,
+            classes=final_classes,
+            scores=final_scores,
+        )
 
 
 class DBNetHead(DBNetFamily):
@@ -156,51 +182,66 @@ class DBNetHead(DBNetFamily):
         self.image_size = image_size
         self.expand_rate = expand_rate
         self.shrink_rate = shrink_rate
-        self.thresholds = self.make_head()
-        self.probas = self.make_head()
-        self.dice = losses.DiceLoss()
-
-    def forward(self, features, targets=None):
-        thresholds = torch.cat([conv(features) for conv in self.thresholds], dim=1)
-        probas = torch.cat([conv(features) for conv in self.probas], dim=1)
-        return (probas, thresholds)
-
-    def make_head(self):
-        return nn.ModuleList(
-            [PredictionConv(self.hidden_size) for _ in range(self.num_classes)]
+        self.thresholds = nn.Sequential(
+            PredictionConv(hidden_size, num_classes),
+        )
+        self.probas = nn.Sequential(
+            PredictionConv(hidden_size, num_classes),
         )
 
-    def visualize_outputs(self, outputs, logger, tag, step, ground_truth: bool = False):
-        if ground_truth:
-            outputs.unsqueeze(1)
+    def forward(self, features, targets=None):
+        thresholds = self.thresholds(features)
+        probas = self.probas(features)
+        return (probas, thresholds)
+
+    @torch.no_grad()
+    def visualize_outputs(
+        self,
+        outputs,
+        logger,
+        tag,
+        step,
+        ground_truth: bool = False,
+    ):
+        probas, thresholds = outputs
+        binmaps = self.db(probas, thresholds)
+        if not ground_truth:
+            probas = torch.sigmoid(probas)
+            thresholds = torch.sigmoid(thresholds)
+
+        probas = utils.stack_image_batch(probas)
+        thresholds = utils.stack_image_batch(thresholds)
+        binmaps = utils.stack_image_batch(binmaps)
+        images = torch.cat([probas, thresholds, binmaps], dim=-1)
+
+        logger.add_image(tag, images, step)
+
+    def db(self, proba, thresh, k=50.0, logits=True):
+        x = k * (proba - thresh)
+        if logits:
+            return torch.sigmoid(x)
         else:
-            outputs = torch.clip(torch.sigmoid(50 * outputs), 0, 1)
-        outputs = utils.stack_image_batch(outputs)
-
-        logger.add_image(tag, outputs, step)
-
-    def db(self, proba, thresh, k=50):
-        pass
+            return x
 
     def compute_loss(self, outputs, targets):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
 
-        # Proba map loss
-        loss_proba = F.binary_cross_entropy_with_logits(
-            pr_probas,
-            gt_probas,
-        )
-
-        # Threshold map loss
-        loss_threshold = F.l1_loss(pr_thresholds, gt_thresholds)
+        # Loss functions
+        bce_logits = F.binary_cross_entropy_with_logits
 
         # Binary map loss
-        gt_binary = torch.sigmoid(1 * (gt_probas - gt_thresholds))
-        pr_binary = torch.sigmoid(1 * (pr_probas - pr_thresholds))
-        loss_binary = F.binary_cross_entropy(pr_binary, gt_binary)
+        pr_bin = self.db(pr_probas, pr_thresholds, logits=False)
+        gt_bin = self.db(gt_probas, gt_thresholds)
+        loss_bin = bce_logits(pr_bin, gt_bin * 1.0)
 
-        loss = loss_proba + loss_threshold + loss_binary
+        # Proba map loss
+        loss_proba = bce_logits(pr_probas, gt_probas * 1.0)
+
+        # Threshold map loss
+        loss_threshold = F.l1_loss(pr_thresholds, gt_thresholds * 1.0)
+
+        loss = loss_bin + loss_proba + 10 * loss_threshold
         return loss
 
 

@@ -35,7 +35,12 @@ def bytes2pillow(bs: bytes) -> Image:
     return image
 
 
-def prepare_input(image: Image, image_width: int, image_height: int):
+def prepare_input(
+    image: Image,
+    image_width: int,
+    image_height: int,
+    center_value: bool = False,
+):
     """Prepare the input to be fed to the model
 
     Args:
@@ -45,6 +50,8 @@ def prepare_input(image: Image, image_width: int, image_height: int):
             The image width W that model expects
         image_height:
             The image height H that model expects
+        center_value:
+            Normalize pixel values to [-1, 1] range.
 
     Returns:
         A numpy array of shape [3, H, W], type `float32`, value normalized to [0, 1] range.
@@ -55,6 +62,8 @@ def prepare_input(image: Image, image_width: int, image_height: int):
     image = image.astype("float32") / 255
     h, w, c = 0, 1, 2
     image = image.transpose([c, h, w])
+    if center_value:
+        image = image * 2 - 1
     return image
 
 
