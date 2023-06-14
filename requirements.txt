@@ -7,3 +7,4 @@ pyclean
 gdown
 tensorboardX
 pydantic
+albumentations
