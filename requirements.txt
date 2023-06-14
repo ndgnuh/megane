@@ -8,3 +8,4 @@ gdown
 tensorboardX
 pydantic
 albumentations
+onnx
