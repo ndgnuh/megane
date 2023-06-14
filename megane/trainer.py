@@ -10,6 +10,7 @@ from torch import optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from megane.augment import Augmentation
 from megane.configs import ModelConfig, TrainConfig
 from megane.data import TextDetectionDataset
 from megane.models import Model, ModelAPI
@@ -80,19 +81,29 @@ class Trainer:
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         # Dataloader
-        def make_loader(data, **kwargs):
+        augmentation = Augmentation(p=0.5)
+
+        def make_loader(data, augment: bool, **kwargs):
+            if augment:
+
+                def transform(sample):
+                    sample = augmentation(sample)
+                    return self.model.encode_sample(sample)
+
+            else:
+                transform = self.model.encode_sample
             data = TextDetectionDataset(
                 data,
                 classes=model_config.classes,
-                transform=self.model.encode_sample,
+                transform=transform,
                 single_class=model_config.single_class,
             )
             return DataLoader(
                 data, **dataloader_config, **kwargs, collate_fn=self.model.collate_fn
             )
 
-        self.train_loader = make_loader(train_data, shuffle=True)
-        self.val_loader = make_loader(val_data)
+        self.train_loader = make_loader(train_data, shuffle=True, augment=True)
+        self.val_loader = make_loader(val_data, augment=False)
         tqdm.write(f"Num training batches: {len(self.train_loader)}")
         tqdm.write(f"Num validation batches: {len(self.val_loader)}")
 

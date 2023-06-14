@@ -83,17 +83,57 @@ def decode(sample: Sample, outputs):
 
 
 class Augmentation:
-    def __init__(self, p=0.5):
+    def __init__(self, p=0.33333):
         self.transform = A.Compose(
             [
-                A.RandomBrightnessContrast(p=p),
-                A.Rotate(10, p=p),
+                # Color fx
+                A.OneOf(
+                    [
+                        A.RandomBrightnessContrast(p=p),
+                        A.InvertImg(),
+                    ],
+                    p=p,
+                ),
+                # Degrade
+                A.OneOf(
+                    [
+                        A.Downscale(p=p),
+                        A.Blur(),
+                        A.MedianBlur(),
+                    ],
+                    p=p,
+                ),
+                # Channel fx
+                A.OneOf(
+                    [
+                        A.ChannelDropout(p=p),
+                        A.ChannelShuffle(p=p),
+                    ],
+                    p=p,
+                ),
+                # Noise
+                A.OneOf(
+                    [
+                        A.ISONoise(),
+                        A.MultiplicativeNoise(),
+                        A.GaussNoise(),
+                    ],
+                    p=p,
+                ),
+                # Affine transform
+                # A.Affine(
+                #     rotate=(-10, 10),
+                #     shear=(-10, 10),
+                #     scale=(0.8, 1.2),
+                #     translate_percent=(-0.1, 0.1),
+                #     p=p,
+                # ),
             ],
             keypoint_params=A.KeypointParams(format="xy"),
         )
 
     def __call__(self, sample: Sample) -> Sample:
         enc = encode(sample)
-        enc = self.transform(enc)
+        enc = self.transform(**enc)
         dec = decode(sample, enc)
         return dec
