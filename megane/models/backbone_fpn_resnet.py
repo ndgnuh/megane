@@ -4,7 +4,8 @@ from torch import nn
 
 
 def ConvNorm(*a, **k):
-    # There is no point adding bias if we are just going to normalize right after that
+    # There is no point adding bias
+    # we are just going to normalize right after that
     conv = nn.Conv2d(*a, **k, bias=False)
     norm = nn.InstanceNorm2d(conv.out_channels)
     relu = nn.ReLU()
@@ -20,7 +21,7 @@ class ResidualBlock(nn.Module):
         )
 
         if stride > 1 or in_channels != out_channels:
-            self.residual = nn.Conv2d(in_channels, out_channels, 1, stride=stride)
+            self.residual = nn.Conv2d(in_channels, out_channels, 1, stride)
         else:
             self.residual = nn.Identity()
         self.relu = nn.ReLU()

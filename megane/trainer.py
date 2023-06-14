@@ -1,5 +1,4 @@
 import random
-import traceback
 from datetime import datetime
 from os import makedirs, path
 
@@ -7,15 +6,21 @@ import numpy as np
 import torch
 from lightning import Fabric
 from tensorboardX import SummaryWriter
-from torch import Tensor, optim
+from torch import optim
 from torch.utils.data import DataLoader
-from torchvision.transforms import functional as TF
 from tqdm import tqdm
 
-from .configs import ModelConfig, TrainConfig
-from .data import TextDetectionDataset
-from .meanap import compute_maf1
-from .models import Model, ModelAPI
+from megane.configs import ModelConfig, TrainConfig
+from megane.data import TextDetectionDataset
+from megane.models import Model, ModelAPI
+from megane.utils import compute_maf1
+
+
+def batch_get_index(batch, i: int):
+    if isinstance(batch, torch.Tensor):
+        return batch[i]
+
+    return [x[i] for x in batch]
 
 
 def loop_loader(loader, total_steps: int):
@@ -65,9 +70,11 @@ class Trainer:
 
         # Model & optimization
         self.model: ModelAPI = Model(model_config)
+        print(self.model)
         if model_config.continue_weight:
             self.model.load_state_dict(
-                torch.load(model_config.continue_weight, map_location="cpu")
+                torch.load(model_config.continue_weight, map_location="cpu"),
+                strict=False,
             )
         # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
@@ -124,14 +131,19 @@ class Trainer:
             pbar.set_postfix({"loss": loss})
 
             if step % print_every == 0:
-                torch.save(
-                    {"images": images[0], "pr": outputs[0], "gt": targets[0]},
-                    "sample-output.pt",
-                )
+                # torch.save(
+                #     {"images": images[0], "pr": outputs[0], "gt": targets[0]},
+                #     "sample-output.pt",
+                # )
                 b_idx = random.choice(range(images.shape[0]))
-                pr_sample = model.decode_sample(images[b_idx], outputs[b_idx])
+                pr_sample = model.decode_sample(
+                    batch_get_index(images, b_idx),
+                    batch_get_index(outputs, b_idx),
+                )
                 gt_sample = model.decode_sample(
-                    images[b_idx], targets[b_idx], ground_truth=True
+                    batch_get_index(images, b_idx),
+                    batch_get_index(targets, b_idx),
+                    ground_truth=True,
                 )
                 logger.add_image("train/sample-pr", pr_sample.visualize_tensor(), step)
                 logger.add_image("train/sample-gt", gt_sample.visualize_tensor(), step)
@@ -140,12 +152,14 @@ class Trainer:
                     logger=logger,
                     tag="train/outputs-pr",
                     step=step,
+                    ground_truth=False,
                 )
                 model.visualize_outputs(
                     targets,
                     logger=logger,
                     tag="train/outputs-gt",
                     step=step,
+                    ground_truth=True,
                 )
                 logger.flush()
 
@@ -190,9 +204,9 @@ class Trainer:
 
             # Inference output
             for i in range(images.shape[0]):
-                _inputs = images[i]
-                _outputs = outputs[i]
-                _targets = targets[i]
+                _inputs = batch_get_index(images, i)
+                _outputs = batch_get_index(outputs, i)
+                _targets = batch_get_index(targets, i)
 
                 pr_sample = model.decode_sample(_inputs, _outputs)
                 gt_sample = model.decode_sample(_inputs, _targets, ground_truth=True)
@@ -221,16 +235,18 @@ class Trainer:
             logger=logger,
             tag="validate/outputs-pr",
             step=step,
+            ground_truth=False,
         )
         model.visualize_outputs(
             raw_targets[idx],
             logger=logger,
             tag="validate/outputs-gt",
             step=step,
+            ground_truth=True,
         )
 
         # Metric
-        logger.add_scalar(f"validate/mean-average-F1", np.mean(maf1_set), step)
+        logger.add_scalar("validate/mean-average-F1", np.mean(maf1_set), step)
 
         # Validation loss
         loss = np.mean(losses)

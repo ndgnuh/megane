@@ -1,6 +1,7 @@
-from .data import TextDetectionDataset, Sample
-from . import utils
-from .models import Model
-from .trainer import Trainer
-from .configs import read as read_config, TrainConfig, ModelConfig
-from .predictor import Predictor
+from megane import utils
+from megane.configs import ModelConfig, TrainConfig
+from megane.configs import read as read_config
+from megane.data import Sample, TextDetectionDataset
+from megane.models import Model
+from megane.predictor import Predictor
+from megane.trainer import Trainer

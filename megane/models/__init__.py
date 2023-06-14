@@ -1,30 +1,7 @@
-from typing import *
+from torch import Tensor, nn
 
-import numpy as np
-import torch
-from torch import Tensor, nn, no_grad
-from torch.nn import functional as F
-from torchvision.models import mobilenet_v3_large, mobilenet_v3_small
-from torchvision.models._utils import IntermediateLayerGetter
-from torchvision.ops import FeaturePyramidNetwork
-from torchvision.transforms import functional as TF
-
-from .. import configs, utils
-from ..configs import (
-    FPNConfig,
-    FViTConfig,
-    HeadConfig,
-    ModelConfig,
-    PCViTConfig,
-    Seq2seqConfig,
-)
-from ..data import Sample
-from .api import ModelAPI
-from .backbone_fpn import FPNBackbone
-from .backbone_fvit import FViTBackbone
-from .backbone_pcvit import PCViTBackbone
-from .head_dbbn import DBBNHead
-from .head_seq2seq import Seq2seq
+from megane import utils
+from megane.models.api import ModelAPI
 
 
 class backbones:

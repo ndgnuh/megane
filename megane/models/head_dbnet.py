@@ -92,6 +92,10 @@ def encode_sample(
     return image, (probas, thresholds)
 
 
+def SimpleFilter(channels):
+    return nn.Conv2d(channels, channels, 3, padding=1, groups=channels)
+
+
 def PredictionConv(hidden_size, num_classes: int = 1):
     aux_size_1 = hidden_size // 4
     aux_size_2 = hidden_size // 8
@@ -115,6 +119,9 @@ def PredictionConv(hidden_size, num_classes: int = 1):
             stride=2,
             bias=False,
         ),
+        SimpleFilter(num_classes),
+        SimpleFilter(num_classes),
+        SimpleFilter(num_classes),
     )
 
 
@@ -172,33 +179,12 @@ class DBNetHead(DBNetFamily):
 
         logger.add_image(tag, outputs, step)
 
+    def db(self, proba, thresh, k=50):
+        pass
+
     def compute_loss(self, outputs, targets):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
-
-        # Background loss
-        # positive = pr_probas[gt_probas > 0]
-        # negative = pr_probas[gt_probas <= 0]
-        # loss_bg = F.cross_entropy(
-        #     positive,
-        #     torch.ones_like(positive),
-        # ) + F.cross_entropy(
-        #     negative,
-        #     torch.zeros_like(negative),
-        # )
-        # loss_bg = loss_bg / 2
-        # pr_backgrounds = 1 - (pr_probas + pr_thresholds)
-        # gt_backgrounds = 1 - (gt_probas + gt_thresholds)
-        # loss_bg = F.cross_entropy(
-        #     torch.stack(
-        #         [pr_backgrounds, pr_probas, pr_thresholds],
-        #         dim=1,
-        #     ),
-        #     torch.stack(
-        #         [gt_backgrounds, gt_probas, gt_thresholds],
-        #         dim=1,
-        #     ).argmax(dim=1),
-        # )
 
         # Proba map loss
         loss_proba = F.binary_cross_entropy_with_logits(
@@ -234,13 +220,19 @@ class HeadSegment(DBNetFamily):
         self.expand_rate = expand_rate
         self.shrink_rate = shrink_rate
         self.outputs = PredictionConv(hidden_size, num_classes + 1)
+        self.contour = losses.ContourLoss()
 
     def forward(self, features, tagets=None):
         outputs = self.outputs(features)
         return outputs
 
     def compute_loss(self, outputs, targets):
-        return F.cross_entropy(outputs, targets)
+        loss_1 = F.cross_entropy(outputs, targets)
+        targets = F.one_hot(targets, self.num_classes + 1).transpose(-1, 1)
+        loss_2 = self.contour(outputs, targets * 1.0)
+
+        loss = (loss_1 + loss_2) / 2
+        return loss
 
     def encode_sample(self, sample):
         image_size = self.image_size
@@ -290,7 +282,9 @@ class HeadSegment(DBNetFamily):
 
         return image, target
 
+    @torch.no_grad()
     def visualize_outputs(self, outputs, logger, tag, step, ground_truth: bool = False):
+        outputs = outputs.cpu()
         if ground_truth:
             outputs = outputs.unsqueeze(1)
         else:

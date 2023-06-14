@@ -1,12 +1,11 @@
 from collections import OrderedDict
+from typing import List
 
 import torch
 from torch import nn, no_grad
 from torchvision import models as vision_models
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.ops import FeaturePyramidNetwork
-
-from ..configs import ModelConfig
 
 
 def _conv_norm_act(in_channels: int, out_channels: int, *a, **k):
@@ -92,21 +91,24 @@ class UpscaleConcat(nn.Module):
 
 
 class FPNBackbone(nn.Module):
-    def __init__(self, config: ModelConfig):
+    def __init__(
+        self,
+        arch: str,
+        hidden_size: int,
+        layers: List[int],
+        feature_module: str | None = None,
+    ):
         super().__init__()
-        self.num_layers = len(config.backbone.layers)
-        self.config = config
-        self.aux_size = config.hidden_size // self.num_layers
-        self.image_size = config.image_size
-        assert self.image_size % 32 == 0
+        self.arch = arch
+        self.num_layers = len(layers)
 
         # Feature extractor
-        self.backbone = self._mk_backbone()
+        self.backbone = self._mk_backbone(arch, feature_module)
 
         # FPN
         self.fpn = self._mk_fpn()
 
-    def _mk_backbone(self):
+    def _mk_backbone(self, arch, feature_module):
         arch = self.config.backbone.arch
         feature_module = self.config.backbone.feature_module
         layers = self.config.backbone.layers

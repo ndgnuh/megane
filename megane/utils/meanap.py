@@ -1,15 +1,17 @@
+from typing import Tuple
+
 import cv2
 import numpy as np
-from typing import Tuple
-from . import utils
+
+from megane.utils.polygons import polygon_area
 
 
 def torch_iou(b1, b2):
     """Wrapper for torchvision.ops.box_iou, receives and returns numpy array.
     This function is only used for testing
     """
-    from torchvision import ops
     import torch
+    from torchvision import ops
 
     b1 = torch.tensor(b1)
     b2 = torch.tensor(b2)
@@ -34,8 +36,8 @@ def compute_iou_polygon(boxes1, boxes2):
     ious = np.zeros((n, m), dtype="float32")
     polygons1 = [np.array(b, dtype="float32") for b in boxes1]
     polygons2 = [np.array(b, dtype="float32") for b in boxes2]
-    areas1 = [utils.polygon_area(b) for b in boxes1]
-    areas2 = [utils.polygon_area(b) for b in boxes2]
+    areas1 = [polygon_area(b) for b in boxes1]
+    areas2 = [polygon_area(b) for b in boxes2]
     for i in range(n):
         for j in range(m):
             p1 = polygons1[i]
