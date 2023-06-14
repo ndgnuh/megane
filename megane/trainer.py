@@ -82,7 +82,10 @@ class Trainer:
         # Dataloader
         def make_loader(data, **kwargs):
             data = TextDetectionDataset(
-                data, model_config.classes, transform=self.model.encode_sample
+                data,
+                classes=model_config.classes,
+                transform=self.model.encode_sample,
+                single_class=model_config.single_class,
             )
             return DataLoader(
                 data, **dataloader_config, **kwargs, collate_fn=self.model.collate_fn

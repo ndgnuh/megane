@@ -59,12 +59,12 @@ class Sample:
     def adapt_metrics(self):
         import numpy as np
 
-        boxes = np.array(self.boxes)
+        boxes = np.array(self.boxes, dtype="object")
         classes = np.array(self.classes)
         return boxes, classes
 
 
-def load_sample_labelme(sample_path, classes):
+def load_sample_labelme(sample_path, classes, single_class: bool):
     """Load a labelme json and convert it to an instance of Sample
 
     Args:
@@ -105,9 +105,12 @@ def load_sample_labelme(sample_path, classes):
         else:
             continue
 
-        assert shape["label"] in classes, f"Unknown class {shape['label']}"
-        class_idx = classes.index(shape["label"])
-        class_indices.append(class_idx)
+        if single_class:
+            class_indices.append(0)
+        else:
+            assert shape["label"] in classes, f"Unknown class {shape['label']}"
+            class_idx = classes.index(shape["label"])
+            class_indices.append(class_idx)
 
     assert len(class_indices) == len(boxes)
 
@@ -133,6 +136,9 @@ class TextDetectionDataset(Dataset):
         cache:
             Should the sample loading be cached?
             The transformation is still applied everytime.
+        single_class:
+            Should the class of data be ignored?
+            If yes, everything will be put as positive and negative.
     """
 
     def __init__(
@@ -141,8 +147,11 @@ class TextDetectionDataset(Dataset):
         classes: List[str],
         transform: Optional[Callable] = None,
         cache: Optional[bool] = True,
+        single_class: Optional[bool] = False,
     ):
         super().__init__()
+
+        # Read sample paths
         root_dir = path.dirname(index)
         with open(index, "r") as fp:
             sample_paths = [line.strip("\n") for line in fp.readlines()]
@@ -151,20 +160,27 @@ class TextDetectionDataset(Dataset):
             ]
         for sample_path in sample_paths:
             assert path.isfile(sample_path), f"{sample_path} does not exists"
+
+        # Should the dataset be cached?
         if cache:
             _load_sample_labelme = lru_cache(load_sample_labelme)
         else:
             _load_sample_labelme = load_sample_labelme
+
+        # Metadata
         self.index = index
         self.sample_paths = sample_paths
         self.transform = transform or (lambda x: x)
         self.classes = tuple(classes)
         self._load_sample = _load_sample_labelme
+        self.single_class = single_class
 
     def __len__(self):
         return len(self.sample_paths)
 
     def __getitem__(self, index):
-        sample = self._load_sample(self.sample_paths[index], self.classes)
+        sample = self._load_sample(
+            self.sample_paths[index], self.classes, self.single_class
+        )
         sample = self.transform(sample)
         return sample

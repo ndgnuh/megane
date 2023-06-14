@@ -132,6 +132,7 @@ class ModelConfig(BaseModel):
     backbone: Dict
     neck: Dict
 
+    single_class: bool = False
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
 
