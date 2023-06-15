@@ -125,10 +125,14 @@ class ModelConfig(BaseModel):
     head: Dict
     backbone: Dict
     neck: Dict
+    resize_mode: str
 
     single_class: bool = False
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
+
+    def __post_init__(self):
+        assert self.resize_mode in ["resize", "letterbox"]
 
     # Stuffs for trainer
     @property

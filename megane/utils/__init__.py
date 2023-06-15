@@ -1,13 +1,17 @@
 from io import BytesIO
 from typing import Dict
 
+import cv2
 import numpy as np
 from PIL import Image
 
+from megane.utils.image import prepare_input
 from megane.utils.masks import *
 from megane.utils.meanap import *
 from megane.utils.misc import *
 from megane.utils.polygons import *
+
+assert prepare_input
 
 try:
     from megane.utils.torch import stack_image_batch
@@ -32,38 +36,6 @@ def bytes2pillow(bs: bytes) -> Image:
     image = Image.open(io)
     image.load()
     io.close()
-    return image
-
-
-def prepare_input(
-    image: Image,
-    image_width: int,
-    image_height: int,
-    center_value: bool = False,
-):
-    """Prepare the input to be fed to the model
-
-    Args:
-        image:
-            Pillow image
-        image_width:
-            The image width W that model expects
-        image_height:
-            The image height H that model expects
-        center_value:
-            Normalize pixel values to [-1, 1] range.
-
-    Returns:
-        A numpy array of shape [3, H, W], type `float32`, value normalized to [0, 1] range.
-    """
-    image = image.convert("RGB")
-    image = image.resize((image_width, image_height))
-    image = np.array(image)
-    image = image.astype("float32") / 255
-    h, w, c = 0, 1, 2
-    image = image.transpose([c, h, w])
-    if center_value:
-        image = image * 2 - 1
     return image
 
 
