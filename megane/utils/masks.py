@@ -170,10 +170,10 @@ def mask_to_polygons(mask):
     polygons = []
     scores = []
     for cnt in cnts:
-        eps = cv2.arcLength(cnt, True) * 0.02
+        eps = cv2.arcLength(cnt, True) * 0.01
         # Do this to avoid rounded corners
         cnt = cv2.approxPolyDP(cnt, eps, closed=False)
-        cnt = cv2.approxPolyDP(cnt, eps, closed=False)
+        cnt = cv2.approxPolyDP(cnt, eps, closed=True)
         if cnt.shape[0] < 3:
             continue
 
