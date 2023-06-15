@@ -18,7 +18,7 @@ class Augmentation:
 
     def __call__(self, sample: Sample) -> Sample:
         enc = A.encode(sample)
-        enc = A.albumen_transform(**enc)
+        enc = self.albumen_transform(**enc)
         dec = A.decode(sample, enc)
-        dec = A.custom_transform(dec)
+        dec = self.custom_transform(dec)
         return dec

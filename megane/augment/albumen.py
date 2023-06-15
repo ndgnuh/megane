@@ -130,15 +130,15 @@ def default_transform(prob, background_images, domain_images):
             ],
             p=prob,
         ),
-        # Affine transform
-        A.Affine(
-            rotate=(-10, 10),
-            shear=(-10, 10),
-            scale=(0.4, 1.1),
-            translate_percent=(-0.2, 0.1),
+        # Geometric transform
+        A.OneOf(
+            [
+                A.ShiftScaleRotate(),
+                A.RandomRotate90(),
+                A.Transpose(),
+            ],
             p=prob,
         ),
-        A.RandomRotate90(p=prob),
     ]
 
     if len(domain_images) > 0:
