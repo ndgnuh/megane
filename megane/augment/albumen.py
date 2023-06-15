@@ -133,7 +133,7 @@ def default_transform(prob, background_images, domain_images):
         # Geometric transform
         A.OneOf(
             [
-                A.ShiftScaleRotate(),
+                A.Affine(fit_output=True),
                 A.RandomRotate90(),
                 A.Transpose(),
             ],
