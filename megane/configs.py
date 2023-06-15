@@ -25,6 +25,34 @@ def default_fabric_config():
     return dict(accelerator="auto")
 
 
+class AugmentConfig(BaseModel):
+    """
+    Configuration for augmentation.
+
+    Attributes:
+        enabled (bool):
+            Flag indicating if augmentation is enabled.
+        background_images (List, optional):
+            List of background images for augmentation. Defaults to an empty list.
+        domain_images (List, optional):
+            List of domain images for augmentation. Defaults to an empty list.
+        prob (float):
+            Probability of applying augmentation.
+
+    Example:
+        config = AugmentConfig(
+            enabled=True,
+            background_images=['bg1.jpg', 'bg2.jpg'],
+            prob=0.5
+        )
+    """
+
+    enabled: bool
+    background_images: List = Field(default_factory=list)
+    domain_images: List = Field(default_factory=list)
+    prob: float = 0.3333
+
+
 class TrainConfig(BaseModel):
     """Training configuration schema.
 
@@ -33,8 +61,12 @@ class TrainConfig(BaseModel):
             Path to train data annotation
         val_data:
             Path to validate data annotation
+        augment:
+            An `AugmentConfig`
         lr:
             Base learning rate
+        augment:
+            Augmentation config
         total_steps:
             Number of training iterations
         print_every:
@@ -56,72 +88,9 @@ class TrainConfig(BaseModel):
     print_every: int
     validate_every: int
 
+    augment: AugmentConfig
     dataloader: Dict = Field(default_factory=dict)
     fabric: Dict = Field(default_factory=default_fabric_config)
-
-
-class HeadConfig(BaseModel):
-    classes: List[str]
-    final_div_factor: int
-    contour_loss_kernel: int = 2
-
-    @property
-    def num_classes(self):
-        return len(self.classes)
-
-
-class Seq2seqConfig(BaseModel):
-    classes: List[str]
-    head_size: int
-    num_max_objects: int
-
-    @property
-    def num_classes(self):
-        return len(self.classes)
-
-
-class FPNConfig(BaseModel):
-    arch: str
-    layers: List[str]
-    hidden_size: int
-    feature_module: Optional[str] = None
-
-    def get_output_size(self):
-        return self.hidden_size
-
-
-class PCViTConfig(BaseModel):
-    patch_size: int
-    hidden_size: int
-    output_size: int
-    latent_size: int
-    num_layers: int
-    num_latents: int
-    num_attention_heads: int
-    final_div_factor: int
-
-    def get_output_size(self):
-        return self.output_size
-
-
-class FViTConfig(BaseModel):
-    patch_size: int
-    output_format: str
-    num_blocks: List[int] = [3, 6, 3]
-    hidden_sizes: List[int] = [32, 64, 128, 96]
-    num_attention_heads: List[int] = [4, 8, 16]
-
-    def get_output_size(self):
-        return self.hidden_sizes[-1]
-
-    @property
-    def num_stages(self):
-        return len(self.num_blocks)
-
-
-class FPNConcat(BaseModel):
-    output_size: int
-    num_upsamples: List[int]
 
 
 class ModelConfig(BaseModel):
@@ -135,13 +104,6 @@ class ModelConfig(BaseModel):
     single_class: bool = False
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
-
-    # Properties that must be provided by the model head configs
-
-    # Properties that must be provided by the model backbone configs
-    @property
-    def hidden_size(self):
-        return self.backbone.get_output_size()
 
     # Stuffs for trainer
     @property

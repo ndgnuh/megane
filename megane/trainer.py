@@ -81,7 +81,10 @@ class Trainer:
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         # Dataloader
-        augmentation = Augmentation(p=0.5)
+        augment = train_config.augment.dict()
+        augment_enabled = augment.pop("enabled")
+        if augment_enabled:
+            augmentation = Augmentation(**augment)
 
         def make_loader(data, augment: bool, **kwargs):
             if augment:
@@ -98,11 +101,19 @@ class Trainer:
                 transform=transform,
                 single_class=model_config.single_class,
             )
-            return DataLoader(
-                data, **dataloader_config, **kwargs, collate_fn=self.model.collate_fn
+            loader = DataLoader(
+                data,
+                **dataloader_config,
+                **kwargs,
+                collate_fn=self.model.collate_fn,
             )
+            return loader
 
-        self.train_loader = make_loader(train_data, shuffle=True, augment=True)
+        self.train_loader = make_loader(
+            train_data,
+            shuffle=True,
+            augment=augment_enabled,
+        )
         self.val_loader = make_loader(val_data, augment=False)
         tqdm.write(f"Num training batches: {len(self.train_loader)}")
         tqdm.write(f"Num validation batches: {len(self.val_loader)}")

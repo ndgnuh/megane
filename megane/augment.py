@@ -83,33 +83,46 @@ def decode(sample: Sample, outputs):
 
 
 class Augmentation:
-    def __init__(self, p=0.33333):
+    def __init__(
+        self,
+        prob=0.33333,
+        background_images: str = [],
+        domain_images: str = [],
+    ):
         self.transform = A.Compose(
             [
                 # Color fx
                 A.OneOf(
                     [
-                        A.RandomBrightnessContrast(p=p),
+                        A.RandomBrightnessContrast(),
+                        A.Solarize(),
+                        A.ToGray(),
+                        A.ToSepia(),
+                        A.ColorJitter(),
                         A.InvertImg(),
+                        A.RandomGamma(),
+                        A.RandomShadow(),
+                        A.RandomSunFlare(),
+                        A.RGBShift(),
                     ],
-                    p=p,
+                    p=prob,
                 ),
                 # Degrade
                 A.OneOf(
                     [
-                        A.Downscale(p=p),
+                        A.Downscale(p=prob),
                         A.Blur(),
                         A.MedianBlur(),
                     ],
-                    p=p,
+                    p=prob,
                 ),
                 # Channel fx
                 A.OneOf(
                     [
-                        A.ChannelDropout(p=p),
-                        A.ChannelShuffle(p=p),
+                        A.ChannelDropout(p=prob),
+                        A.ChannelShuffle(p=prob),
                     ],
-                    p=p,
+                    p=prob,
                 ),
                 # Noise
                 A.OneOf(
@@ -118,16 +131,17 @@ class Augmentation:
                         A.MultiplicativeNoise(),
                         A.GaussNoise(),
                     ],
-                    p=p,
+                    p=prob,
                 ),
                 # Affine transform
                 A.Affine(
                     rotate=(-10, 10),
                     shear=(-10, 10),
-                    scale=(0.8, 1.2),
-                    translate_percent=(-0.1, 0.1),
-                    p=p,
+                    scale=(0.4, 1.1),
+                    translate_percent=(-0.2, 0.1),
+                    p=prob,
                 ),
+                A.RandomRotate90(p=prob),
             ],
             keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
         )
