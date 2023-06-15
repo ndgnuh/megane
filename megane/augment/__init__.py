@@ -1,3 +1,5 @@
+import random
+
 from megane.augment import albumen as A
 from megane.augment import custom as CA
 from megane.data import Sample
@@ -22,8 +24,14 @@ class Augmentation:
         )
 
     def __call__(self, sample: Sample) -> Sample:
-        enc = A.encode(sample)
-        enc = self.albumen_transform(**enc)
-        dec = A.decode(sample, enc)
-        dec = self.custom_transform(dec)
+        if random.choice((True, False)):
+            enc = A.encode(sample)
+            enc = self.albumen_transform(**enc)
+            dec = A.decode(sample, enc)
+            dec = self.custom_transform(dec)
+        else:
+            sample = self.custom_transform(sample)
+            enc = A.encode(sample)
+            enc = self.albumen_transform(**enc)
+            dec = A.decode(sample, enc)
         return dec

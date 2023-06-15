@@ -92,15 +92,15 @@ def default_transform(prob, background_images, domain_images):
         A.OneOf(
             [
                 A.RandomBrightnessContrast(),
-                A.Solarize(),
+                # A.Solarize(),
                 A.ToGray(),
                 A.ToSepia(),
-                A.ColorJitter(),
+                # A.ColorJitter(),
                 A.InvertImg(),
                 A.RandomGamma(),
                 # A.RandomShadow(),
                 # A.RandomSunFlare(),
-                A.RGBShift(),
+                # A.RGBShift(),
             ],
             p=prob,
         ),
