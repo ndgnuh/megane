@@ -6,6 +6,10 @@ from megane import utils
 from megane.data import Sample
 
 
+def idendity(**kw):
+    return kw
+
+
 def encode(sample: Sample):
     """
     Encodes a Sample to albumentation inputs.
@@ -82,72 +86,72 @@ def decode(sample: Sample, outputs):
     )
 
 
-class Augmentation:
-    def __init__(
-        self,
-        prob=0.33333,
-        background_images: str = [],
-        domain_images: str = [],
-    ):
-        self.transform = A.Compose(
+def default_transform(prob, background_images, domain_images):
+    transformations = [
+        # Color fx
+        A.OneOf(
             [
-                # Color fx
-                A.OneOf(
-                    [
-                        A.RandomBrightnessContrast(),
-                        A.Solarize(),
-                        A.ToGray(),
-                        A.ToSepia(),
-                        A.ColorJitter(),
-                        A.InvertImg(),
-                        A.RandomGamma(),
-                        A.RandomShadow(),
-                        A.RandomSunFlare(),
-                        A.RGBShift(),
-                    ],
-                    p=prob,
-                ),
-                # Degrade
-                A.OneOf(
-                    [
-                        A.Downscale(p=prob),
-                        A.Blur(),
-                        A.MedianBlur(),
-                    ],
-                    p=prob,
-                ),
-                # Channel fx
-                A.OneOf(
-                    [
-                        A.ChannelDropout(p=prob),
-                        A.ChannelShuffle(p=prob),
-                    ],
-                    p=prob,
-                ),
-                # Noise
-                A.OneOf(
-                    [
-                        A.ISONoise(),
-                        A.MultiplicativeNoise(),
-                        A.GaussNoise(),
-                    ],
-                    p=prob,
-                ),
-                # Affine transform
-                A.Affine(
-                    rotate=(-10, 10),
-                    shear=(-10, 10),
-                    scale=(0.4, 1.1),
-                    translate_percent=(-0.2, 0.1),
-                    p=prob,
-                ),
-                A.RandomRotate90(p=prob),
+                A.RandomBrightnessContrast(),
+                A.Solarize(),
+                A.ToGray(),
+                A.ToSepia(),
+                A.ColorJitter(),
+                A.InvertImg(),
+                A.RandomGamma(),
+                A.RandomShadow(),
+                A.RandomSunFlare(),
+                A.RGBShift(),
             ],
-            keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
-        )
+            p=prob,
+        ),
+        # Degrade
+        A.OneOf(
+            [
+                A.Downscale(p=prob),
+                A.Blur(),
+                A.MedianBlur(),
+            ],
+            p=prob,
+        ),
+        # Channel fx
+        A.OneOf(
+            [
+                A.ChannelDropout(p=prob),
+                A.ChannelShuffle(p=prob),
+            ],
+            p=prob,
+        ),
+        # Noise
+        A.OneOf(
+            [
+                A.ISONoise(),
+                A.MultiplicativeNoise(),
+                A.GaussNoise(),
+            ],
+            p=prob,
+        ),
+        # Affine transform
+        A.Affine(
+            rotate=(-10, 10),
+            shear=(-10, 10),
+            scale=(0.4, 1.1),
+            translate_percent=(-0.2, 0.1),
+            p=prob,
+        ),
+        A.RandomRotate90(p=prob),
+    ]
 
-    def __call__(self, sample: Sample) -> Sample:
-        enc = encode(sample)
-        enc = self.transform(**enc)
-        dec = decode(sample, enc)
-        return dec
+    if len(domain_images) > 0:
+        domain_transforms = A.OneOf(
+            [
+                A.FDA(domain_images, p=0.4),
+                A.HistogramMatching(domain_images, p=0.2),
+                A.PixelDistributionAdaptation(domain_images, p=0.4),
+            ],
+            p=prob,
+        )
+        transformations.append(domain_transforms)
+    return A.Compose(
+        transformations,
+        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
+    )
