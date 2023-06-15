@@ -81,10 +81,14 @@ class Trainer:
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         # Dataloader
-        augment = train_config.augment.dict()
-        augment_enabled = augment.pop("enabled")
+        augment = train_config.augment
+        augment_enabled = augment.enabled
         if augment_enabled:
-            augmentation = Augmentation(**augment)
+            augmentation = Augmentation(
+                prob=augment.prob,
+                background_images=augment.background_images,
+                domain_images=augment.domain_images,
+            )
 
         def make_loader(data, augment: bool, **kwargs):
             if augment:

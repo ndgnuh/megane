@@ -8,6 +8,7 @@ class Augmentation:
         prob=0.33333,
         background_images: str = [],
         domain_images: str = [],
+        **other
     ):
         self.albumen_transform = A.default_transform(
             prob=prob,

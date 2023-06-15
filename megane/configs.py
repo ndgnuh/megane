@@ -5,10 +5,11 @@ from pydantic import BaseModel as _BaseModel
 from pydantic import Field
 
 
-class BaseModel(_BaseModel):
-    @classmethod
-    def from_file(cls, config_path):
-        return cls.parse_obj(read(config_path))
+def readline(fpath):
+    with open(fpath) as fp:
+        lines = [line.strip() for line in fp.readlines()]
+        lines = [line for line in lines if len(line) > 0]
+    return lines
 
 
 def read(config_path):
@@ -19,6 +20,12 @@ def read(config_path):
     if "name" not in config:
         config["name"] = path.splitext(path.basename(config_path))[0]
     return config
+
+
+class BaseModel(_BaseModel):
+    @classmethod
+    def from_file(cls, config_path):
+        return cls.parse_obj(read(config_path))
 
 
 def default_fabric_config():
@@ -48,9 +55,27 @@ class AugmentConfig(BaseModel):
     """
 
     enabled: bool
-    background_images: List = Field(default_factory=list)
-    domain_images: List = Field(default_factory=list)
+    background_index: str = None
+    domain_index: str = None
     prob: float = 0.3333
+
+    @property
+    def domain_images(self):
+        index_file = self.domain_index
+        if index_file is None:
+            return []
+        root = path.dirname(index_file)
+        paths = readline(index_file)
+        return [path.join(root, p) for p in paths]
+
+    @property
+    def background_images(self):
+        index_file = self.background_index
+        if index_file is None:
+            return []
+        root = path.dirname(index_file)
+        paths = readline(index_file)
+        return [path.join(root, p) for p in paths]
 
 
 class TrainConfig(BaseModel):
