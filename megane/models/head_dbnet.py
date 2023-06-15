@@ -410,9 +410,15 @@ class DBNetHeadForDetection(DBNetFamily):
             pr = torch.stack([pr_bg, pr_threshold, pr_proba], dim=1)
             gt = torch.stack([gt_bg, gt_threshold, gt_proba], dim=1)
             extra_loss = extra_loss + F.cross_entropy(pr, gt)
+
+            # DB Loss
+            k = 50
+            pr = k * (gt_proba - gt_threshold)
+            gt = torch.sigmoid(k * (gt_proba - gt_threshold))
+            extra_loss = extra_loss + F.binary_cross_entropy_with_logits(pr, gt)
             count = count + 1
 
-        loss = loss + extra_loss / count
+        loss = loss + extra_loss / count / 2
         return loss
 
     def encode_sample(self, sample: Sample):
