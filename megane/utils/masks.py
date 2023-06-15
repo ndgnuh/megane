@@ -170,14 +170,14 @@ def mask_to_polygons(mask):
     polygons = []
     scores = []
     for cnt in cnts:
-        rect = cv2.minAreaRect(cnt)
-        (x, y), (w, h), a = rect
-        if h == 0 or w == 0:
+        eps = cv2.arcLength(cnt, True) * 0.02
+        # Do this to avoid rounded corners
+        cnt = cv2.approxPolyDP(cnt, eps, closed=False)
+        cnt = cv2.approxPolyDP(cnt, eps, closed=False)
+        if cnt.shape[0] < 3:
             continue
 
-        eps = min(w, h) * 0.1
-        polygon = cv2.approxPolyDP(cnt, eps, closed=True)
-        polygon = polygon[:, 0, :]
+        polygon = cnt[:, 0, :]
         score = find_score(mask, polygon)
         polygon = [(x / width, y / height) for (x, y) in polygon]
         polygons.append(polygon)
