@@ -9,3 +9,4 @@ tensorboardX
 pydantic
 albumentations
 onnx
+lenses

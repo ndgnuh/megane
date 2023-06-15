@@ -1,4 +1,5 @@
 from megane.augment import albumen as A
+from megane.augment import custom as CA
 from megane.data import Sample
 
 
@@ -15,7 +16,10 @@ class Augmentation:
             background_images=background_images,
             domain_images=domain_images,
         )
-        self.custom_transform = lambda x: x
+        self.custom_transform = CA.ReplaceBackground(
+            p=prob,
+            background_images=background_images,
+        )
 
     def __call__(self, sample: Sample) -> Sample:
         enc = A.encode(sample)

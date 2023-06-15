@@ -98,8 +98,8 @@ def default_transform(prob, background_images, domain_images):
                 A.ColorJitter(),
                 A.InvertImg(),
                 A.RandomGamma(),
-                A.RandomShadow(),
-                A.RandomSunFlare(),
+                # A.RandomShadow(),
+                # A.RandomSunFlare(),
                 A.RGBShift(),
             ],
             p=prob,
@@ -133,9 +133,16 @@ def default_transform(prob, background_images, domain_images):
         # Geometric transform
         A.OneOf(
             [
-                A.Affine(fit_output=True),
-                A.RandomRotate90(),
-                A.Transpose(),
+                A.Affine(
+                    scale=(0.4, 1),
+                    rotate=(-30, 30),
+                    translate_percent=0.0,
+                    shear=0,
+                    keep_ratio=True,
+                    fit_output=True,
+                ),
+                # A.RandomRotate90(),
+                # A.Transpose(),
             ],
             p=prob,
         ),
@@ -145,8 +152,8 @@ def default_transform(prob, background_images, domain_images):
         domain_transforms = A.OneOf(
             [
                 A.FDA(domain_images, p=0.4),
-                A.HistogramMatching(domain_images, p=0.2),
-                A.PixelDistributionAdaptation(domain_images, p=0.4),
+                # A.HistogramMatching(domain_images, p=0.2),
+                # A.PixelDistributionAdaptation(domain_images, p=0.4),
             ],
             p=prob,
         )
