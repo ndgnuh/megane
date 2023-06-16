@@ -50,25 +50,3 @@ def polygon2xyxy(polygon):
 def xyxy2polygon(xyxy):
     xmin, ymin, xmax, ymax = xyxy
     return [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
-
-
-def init_from_ns(ns, config: Dict):
-    """Helper function that takes a namespace and a dictionary
-    to initialize an instance.
-
-    Args:
-        ns:
-            A namespace of any type, must support `getattr`.
-        config:
-            A dict with the keyword arguments.
-            Must contain the `type` key.
-            The `type` is the reflection key to determine the
-            type name in the specified namespace.
-        *args:
-            Extra positional arguments
-
-    Returns:
-        The initialized instance.
-    """
-    kind = config.pop("type")
-    return getattr(ns, kind)(**config)

@@ -1,5 +1,6 @@
 from functools import wraps
 from inspect import currentframe
+from typing import Dict
 
 
 def with_batch_mode(f):
@@ -65,3 +66,25 @@ def save_args():
         pass
     for k, v in namespace.items():
         setattr(self, k, v)
+
+
+def init_from_ns(ns, config: Dict):
+    """Helper function that takes a namespace and a dictionary
+    to initialize an instance.
+
+    Args:
+        ns:
+            A namespace of any type, must support `getattr`.
+        config:
+            A dict with the keyword arguments.
+            Must contain the `type` key.
+            The `type` is the reflection key to determine the
+            type name in the specified namespace.
+        *args:
+            Extra positional arguments
+
+    Returns:
+        The initialized instance.
+    """
+    kind = config.pop("type")
+    return getattr(ns, kind)(**config)

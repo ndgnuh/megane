@@ -51,6 +51,23 @@ def letterbox(
     return letterboxed_image
 
 
+def pillow_to_numpy(image: Image) -> np.ndarray:
+    """
+    Converts a PIL Image object to a RGB numpy array with CHW format.
+
+    Args:
+        image (Image): The input PIL Image object.
+
+    Returns:
+        np.ndarray: The numpy array representation of the image.
+    """
+    img = np.array(image.convert("RGB"), dtype="float32")
+    img = img / 255
+    h, w, c = 0, 1, 2
+    img = img.transpose(c, h, w)
+    return img
+
+
 def prepare_input(
     image: Image,
     image_width: int,
