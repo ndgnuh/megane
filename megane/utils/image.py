@@ -55,7 +55,7 @@ def prepare_input(
     image: Image,
     image_width: int,
     image_height: int,
-    resize_mode: str,
+    resize_mode: str = "resize",
     center_value: bool = False,
 ):
     """Prepare the input to be fed to the model
