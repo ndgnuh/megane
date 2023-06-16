@@ -95,8 +95,10 @@ def default_transform(prob, background_images, domain_images):
                 A.RandomBrightnessContrast(),
                 A.InvertImg(),
                 A.ToGray(),
+                A.Equalize(),
                 A.ChannelDropout(),
                 A.ChannelShuffle(),
+                A.FancyCPA(),
                 # A.Solarize(),
                 # A.ToSepia(),
                 # A.ColorJitter(),
@@ -110,7 +112,8 @@ def default_transform(prob, background_images, domain_images):
         # Degrade
         A.OneOf(
             [
-                A.Downscale(),
+                A.PixelDropout(),
+                A.Downscale(interpolation=cv2.INTER_LINEAR),
                 A.Blur(),
                 A.MedianBlur(),
                 A.ISONoise(),
@@ -122,6 +125,7 @@ def default_transform(prob, background_images, domain_images):
         # Geometric transform/rotate
         A.OneOf(
             [
+                A.Perspective(fit_output=True),
                 A.RandomRotate90(),
                 A.SafeRotate((-180, 180), border_mode=cv2.BORDER_CONSTANT),
             ],
