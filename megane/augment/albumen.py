@@ -1,4 +1,5 @@
 import albumentations as A
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -88,12 +89,14 @@ def decode(sample: Sample, outputs):
 
 def default_transform(prob, background_images, domain_images):
     transformations = [
-        # Color fx
+        # Color effects
         A.OneOf(
             [
                 A.RandomBrightnessContrast(),
                 A.InvertImg(),
                 A.ToGray(),
+                A.ChannelDropout(),
+                A.ChannelShuffle(),
                 # A.Solarize(),
                 # A.ToSepia(),
                 # A.ColorJitter(),
@@ -110,20 +113,6 @@ def default_transform(prob, background_images, domain_images):
                 A.Downscale(),
                 A.Blur(),
                 A.MedianBlur(),
-            ],
-            p=prob,
-        ),
-        # Channel fx
-        A.OneOf(
-            [
-                A.ChannelDropout(),
-                A.ChannelShuffle(),
-            ],
-            p=prob,
-        ),
-        # Noise
-        A.OneOf(
-            [
                 A.ISONoise(),
                 A.MultiplicativeNoise(),
                 A.GaussNoise(),
@@ -134,7 +123,7 @@ def default_transform(prob, background_images, domain_images):
         A.OneOf(
             [
                 A.RandomRotate90(),
-                A.SafeRotate((-180, 180)),
+                A.SafeRotate((-180, 180), border_mode=cv2.BORDER_CONSTANT),
             ],
             p=prob,
         )
