@@ -92,12 +92,12 @@ def default_transform(prob, background_images, domain_images):
         A.OneOf(
             [
                 A.RandomBrightnessContrast(),
-                # A.Solarize(),
-                A.ToGray(),
-                A.ToSepia(),
-                # A.ColorJitter(),
                 A.InvertImg(),
-                A.RandomGamma(),
+                A.ToGray(),
+                # A.Solarize(),
+                # A.ToSepia(),
+                # A.ColorJitter(),
+                # A.RandomGamma(),
                 # A.RandomShadow(),
                 # A.RandomSunFlare(),
                 # A.RGBShift(),
@@ -107,7 +107,7 @@ def default_transform(prob, background_images, domain_images):
         # Degrade
         A.OneOf(
             [
-                A.Downscale(p=prob),
+                A.Downscale(),
                 A.Blur(),
                 A.MedianBlur(),
             ],
@@ -116,8 +116,8 @@ def default_transform(prob, background_images, domain_images):
         # Channel fx
         A.OneOf(
             [
-                A.ChannelDropout(p=prob),
-                A.ChannelShuffle(p=prob),
+                A.ChannelDropout(),
+                A.ChannelShuffle(),
             ],
             p=prob,
         ),
@@ -130,28 +130,35 @@ def default_transform(prob, background_images, domain_images):
             ],
             p=prob,
         ),
-        # Geometric transform
+        # Geometric transform/rotate
         A.OneOf(
             [
-                A.Affine(
-                    scale=(0.4, 1),
-                    rotate=(-30, 30),
-                    translate_percent=0.0,
-                    shear=0,
-                    keep_ratio=True,
-                    fit_output=True,
-                ),
-                # A.RandomRotate90(),
-                # A.Transpose(),
+                A.RandomRotate90(),
+                A.SafeRotate((-180, 180)),
             ],
             p=prob,
-        ),
+        )
+        # A.OneOf(
+        #     [
+        #         A.Affine(
+        #             scale=(0.4, 1),
+        #             rotate=(-30, 30),
+        #             translate_percent=0.0,
+        #             shear=0,
+        #             keep_ratio=True,
+        #             fit_output=True,
+        #         ),
+        #         # A.RandomRotate90(),
+        #         # A.Transpose(),
+        #     ],
+        #     p=prob,
+        # ),
     ]
 
     if len(domain_images) > 0:
         domain_transforms = A.OneOf(
             [
-                A.FDA(domain_images, p=0.4),
+                A.FDA(domain_images, beta_limit=0.025),
                 # A.HistogramMatching(domain_images, p=0.2),
                 # A.PixelDistributionAdaptation(domain_images, p=0.4),
             ],
