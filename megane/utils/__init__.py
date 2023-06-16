@@ -64,6 +64,8 @@ def init_from_ns(ns, config: Dict):
             Must contain the `type` key.
             The `type` is the reflection key to determine the
             type name in the specified namespace.
+        *args:
+            Extra positional arguments
 
     Returns:
         The initialized instance.

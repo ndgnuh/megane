@@ -361,14 +361,14 @@ class DBNetHeadForDetection(DBNetFamily):
         hidden_size: int,
         num_classes: int,
         expand_rate: float = 0.4,
+        resize_mode: str = "resize",
     ):
         super().__init__()
-        self.hidden_size = hidden_size
-        self.num_classes = num_classes
-        self.image_size = image_size
+        utils.save_args()
         # Rewire the decode function
         self.shrink_rate = expand_rate
         self.expand_rate = 0
+
         # 0 = background
         self.probas = PredictionConv(hidden_size, num_classes + 1)
         # 0 = threshold
@@ -427,7 +427,7 @@ class DBNetHeadForDetection(DBNetFamily):
         r = self.shrink_rate
 
         # Process inputs
-        image = utils.prepare_input(sample.image, sz, sz)
+        image = utils.prepare_input(sample.image, sz, sz, resize_mode=self.resize_mode)
 
         # Process targets
         # Expand polygons

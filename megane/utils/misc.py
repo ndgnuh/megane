@@ -1,4 +1,5 @@
 from functools import wraps
+from inspect import currentframe
 
 
 def with_batch_mode(f):
@@ -30,3 +31,37 @@ def with_batch_mode(f):
         return f(x, *a, **k)
 
     return wrapped
+
+
+def save_args():
+    """Save local variables as attributes of the class instance.
+
+    This function assumes that it is defined within a class and is intended to save
+    the local variables in the current scope as attributes of the class instance.
+
+    Usage:
+        save_args()
+
+    Notes:
+        - This function should be called from within an instance method of a class.
+        - It saves all local variables (except the class reference)
+          as attributes of the class instance.
+        - This code use the dirty `inspect.currentframe` hack.
+
+    Example:
+        class MyClass:
+            def __init__(self, a, b):
+                save_args()
+
+        obj = MyClass(10, 20)
+        print(obj.a)  # Output: 10
+        print(obj.b)  # Output: 20
+    """
+    namespace = currentframe().f_back.f_locals
+    self = namespace.pop("self")
+    try:
+        namespace.pop("__class__")
+    except Exception:
+        pass
+    for k, v in namespace.items():
+        setattr(self, k, v)
