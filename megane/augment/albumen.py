@@ -126,7 +126,6 @@ def default_transform(prob, background_images, domain_images):
         A.OneOf(
             [
                 A.Perspective(fit_output=True),
-                A.RandomRotate90(),
                 A.SafeRotate((-180, 180), border_mode=cv2.BORDER_CONSTANT),
             ],
             p=prob,
@@ -151,9 +150,9 @@ def default_transform(prob, background_images, domain_images):
     if len(domain_images) > 0:
         domain_transforms = A.OneOf(
             [
-                A.FDA(domain_images, beta_limit=0.025),
-                # A.HistogramMatching(domain_images, p=0.2),
-                # A.PixelDistributionAdaptation(domain_images, p=0.4),
+                # A.FDA(domain_images, beta_limit=0.025),
+                A.HistogramMatching(domain_images, p=0.2),
+                A.PixelDistributionAdaptation(domain_images, p=0.4),
             ],
             p=prob,
         )
