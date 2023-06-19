@@ -98,7 +98,7 @@ def default_transform(prob, background_images, domain_images):
                 A.Equalize(),
                 A.ChannelDropout(),
                 A.ChannelShuffle(),
-                A.FancyCPA(),
+                A.FancyPCA(),
                 # A.Solarize(),
                 # A.ToSepia(),
                 # A.ColorJitter(),

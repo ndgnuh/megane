@@ -1,7 +1,7 @@
 from torch import Tensor, nn
 
-from megane import utils
 from megane.models.api import ModelAPI
+from megane.utils import init_from_ns
 
 
 class backbones:
@@ -12,6 +12,7 @@ class backbones:
         resnet_tiny_26,
         resnet_tiny_50,
     )
+    from megane.models.backbone_mobilenet import afvit_t
 
     # from .backbone_fpn import FPNBackbone as fpn
     # from .backbone_fvit import FViTBackbone as fvit
@@ -37,9 +38,15 @@ class Model(nn.Module):
         self.image_size = config.image_size
 
         # Backbone
-        self.backbone = utils.init_from_ns(backbones, config.backbone)
-        self.neck = utils.init_from_ns(necks, config.neck)
-        self.head = utils.init_from_ns(heads, config.head)
+        self.backbone = init_from_ns(backbones, config.backbone)
+        self.neck = init_from_ns(necks, config.neck)
+        try:
+            self.head = init_from_ns(heads, config.head, config)
+        except Exception:
+            self.head = init_from_ns(heads, config.head)
+
+        # Assign configs to allow access
+        self.head.config = config
 
         # Ensure head is an ModelAPI compat
         assert isinstance(self.head, ModelAPI)
