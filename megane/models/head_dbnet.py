@@ -360,14 +360,12 @@ class DBNetHeadForDetection(DBNetFamily):
         image_size: int,
         hidden_size: int,
         num_classes: int,
-        expand_rate: float = 0.4,
+        shrink_rate: float = 0.4,
+        expand_rate: float = 1.5,
         resize_mode: str = "resize",
     ):
         super().__init__()
         utils.save_args()
-        # Rewire the decode function
-        self.shrink_rate = expand_rate
-        self.expand_rate = 0
 
         # 0 = background
         self.probas = PredictionConv(hidden_size, num_classes + 1)
@@ -436,6 +434,8 @@ class DBNetHeadForDetection(DBNetFamily):
         lengths = map(utils.polygon_perimeter, boxes)
         dists = [(1 - r**2) * A / L for A, L in zip(areas, lengths)]
         expand_boxes = starmap(utils.offset_polygon, zip(boxes, dists))
+        dists = map(lambda x: -x, dists)
+        shrink_boxes = starmap(utils.offset_polygon, zip(boxes, dists))
 
         # Helper function to filter boxes
         def filter_boxes(orig_boxes, class_idx):
@@ -451,7 +451,7 @@ class DBNetHeadForDetection(DBNetFamily):
         for class_idx in range(num_classes):
             # Filter boxes by class
             expand_boxes_c = filter_boxes(expand_boxes, class_idx)
-            boxes_c = filter_boxes(boxes, class_idx)
+            boxes_c = filter_boxes(shrink_boxes, class_idx)
             proba = utils.draw_mask(sz, sz, boxes_c)
             thresh = utils.draw_mask(sz, sz, expand_boxes_c)
             thresh = np.clip(thresh - proba, 0, 1)
@@ -506,10 +506,18 @@ class DBNetHeadForDetection(DBNetFamily):
         final_classes = []
         final_scores = []
         final_polygons = []
+        r = self.expand_rate
         for class_idx in range(self.num_classes):
             class_mask = classes == (class_idx + 1)
             mask = masks * class_mask
             polygons, scores = utils.mask_to_polygons(mask)
+            if r > 0:
+                areas = utils.polygon_area(polygons, batch=True)
+                lengths = utils.polygon_perimeter(polygons, batch=True)
+                dists = [A * r / L for (A, L) in zip(areas, lengths)]
+                polygons = [
+                    utils.offset_polygon(p, d) for (p, d) in zip(polygons, dists)
+                ]
 
             final_polygons.extend(polygons)
             final_classes.extend([class_idx] * len(polygons))
