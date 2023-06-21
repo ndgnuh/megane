@@ -71,8 +71,8 @@ def draw_threshold_mask(
         # Draw to a canvas first
         # and then fill the inner box with background
         canvas = np.zeros_like(mask)
-        canvas = cv2.fillConvexPoly(canvas, outer_box, 1)
-        canvas = cv2.fillConvexPoly(canvas, inner_box, 0)
+        canvas = cv2.fillConvexPoly(canvas, np.array(outer_box).astype(int), 1)
+        canvas = cv2.fillConvexPoly(canvas, np.array(inner_box).astype(int), 0)
         # yank the canvas to the threshold map
         mask = mask + canvas
     # Normalize threshold map to 0..1
@@ -97,7 +97,7 @@ def draw_mask(width: int, height: int, polygons: np.ndarray):
     # mask_to_box
     mask = np.zeros((height, width), dtype="float32")
     for polygon in polygons:
-        mask = cv2.fillConvexPoly(mask, polygon, 1)
+        mask = cv2.fillConvexPoly(mask, np.array(polygon).astype(int), 1)
     return mask
 
 
@@ -122,7 +122,8 @@ def mask_to_rrect(mask, open_kernel=None):
     else:
         bin_mask = mask
     bin_mask = (bin_mask * 255).astype("uint8")
-    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, _ = cv2.findContours(
+        bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     def should_square(rect):
         (x, y), (w, h), a = rect
@@ -165,7 +166,8 @@ def mask_to_polygons(mask):
     height, width = mask.shape
     bin_mask = mask > 0
     bin_mask = (bin_mask * 255).astype("uint8")
-    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, _ = cv2.findContours(
+        bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     polygons = []
     scores = []

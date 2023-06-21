@@ -18,10 +18,13 @@ class Augmentation:
             background_images=background_images,
             domain_images=domain_images,
         )
-        self.custom_transform = CA.ReplaceBackground(
-            p=prob,
-            background_images=background_images,
-        )
+        if len(background_images) > 0:
+            self.custom_transform = CA.ReplaceBackground(
+                p=prob,
+                background_images=background_images,
+            )
+        else:
+            self.custom_transform = lambda x: x
 
     def __call__(self, sample: Sample) -> Sample:
         if random.choice((True, False)):

@@ -2,7 +2,6 @@ from itertools import starmap
 
 # Reference: https://arxiv.org/abs/1911.08947
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
@@ -388,11 +387,14 @@ class DBNetHeadForDetection(DBNetFamily):
         if self.num_classes == 1:
             loss_fn = F.binary_cross_entropy_with_logits
         else:
-            loss_fn = F.multi_label_margin_loss
+            loss_fn = F.multilabel_soft_margin_loss
 
         # Prepare
         pr = torch.cat([pr_probas, pr_thresholds], dim=1)
         gt = torch.cat([gt_probas, gt_thresholds], dim=1)
+        if self.num_classes > 1:
+            pr = pr.transpose(1, -1).reshape(-1, pr.size(1))
+            gt = gt.transpose(1, -1).reshape(-1, gt.size(1))
         loss = loss_fn(pr, gt)
 
         # Additional loss between the threshold and the proba
@@ -432,29 +434,28 @@ class DBNetHeadForDetection(DBNetFamily):
         boxes = utils.denormalize_polygon(sample.boxes, sz, sz, batch=True)
         areas = map(utils.polygon_area, boxes)
         lengths = map(utils.polygon_perimeter, boxes)
-        dists = [(1 - r**2) * A / L for A, L in zip(areas, lengths)]
-        expand_boxes = starmap(utils.offset_polygon, zip(boxes, dists))
-        dists = map(lambda x: -x, dists)
-        shrink_boxes = starmap(utils.offset_polygon, zip(boxes, dists))
+        dists = [(1 - r**2) * A / (L + 1e-6) for (A, L) in zip(areas, lengths)]
+        expand_boxes = [utils.offset_polygon(b, d) for b, d in zip(boxes, dists)]
+        shrink_boxes = [utils.offset_polygon(b, -d) for b, d in zip(boxes, dists)]
 
-        # Helper function to filter boxes
-        def filter_boxes(orig_boxes, class_idx):
-            return [
-                np.array(box).astype(int)
-                for (box, class_idx_) in zip(orig_boxes, sample.classes)
-                if class_idx == class_idx_
-            ]
+        # Numpy makes it easy to filter
+        shrink_boxes = np.array(shrink_boxes, dtype="object")
+        expand_boxes = np.array(expand_boxes, dtype="object")
+        classes = np.array(sample.classes, dtype="object")
 
         # Draw target masks
         probas = []
         thresholds = []
         for class_idx in range(num_classes):
-            # Filter boxes by class
-            expand_boxes_c = filter_boxes(expand_boxes, class_idx)
-            boxes_c = filter_boxes(shrink_boxes, class_idx)
-            proba = utils.draw_mask(sz, sz, boxes_c)
-            thresh = utils.draw_mask(sz, sz, expand_boxes_c)
-            thresh = np.clip(thresh - proba, 0, 1)
+            # Filter boxes by classes
+            class_mask = class_idx == classes
+            expand_boxes_c = expand_boxes[class_mask]
+            shrink_boxes_c = shrink_boxes[class_mask]
+
+            # Draw masks
+            proba = utils.draw_mask(sz, sz, shrink_boxes_c)
+            thresh = utils.draw_mask(sz, sz, expand_boxes_c) - proba
+            thresh = np.clip(thresh, 0, 1)
 
             # Add result
             probas.append(proba)

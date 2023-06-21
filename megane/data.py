@@ -41,13 +41,31 @@ class Sample:
                 box.shape[-1] == 2 and box.ndim == 2
             ), f"Invalid bounding box format, {box.shape}"
 
-    def visualize(self, outline=(255, 0, 0)) -> Image:
+    def visualize(self) -> Image:
+        colors = [
+            "#282a2e",
+            "#a54242",
+            "#8c9440",
+            "#de935f",
+            "#5f819d",
+            "#85678f",
+            "#5e8d87",
+            "#707880",
+            "#373b41",
+            "#cc6666",
+            "#b5bd68",
+            "#f0c674",
+            "#81a2be",
+            "#b294bb",
+            "#8abeb7",
+            "#c5c8c6"
+        ]
         image = self.image.copy()
         w, h = image.size
         draw = ImageDraw.Draw(image)
-        for polygon in self.boxes:
+        for polygon, class_id in zip(self.boxes, self.classes):
             xy = [(int(x * w), int(y * h)) for (x, y) in polygon]
-            draw.polygon(xy, outline=outline)
+            draw.polygon(xy, outline=colors[class_id])
         return image
 
     def visualize_tensor(self, *a, **k):

@@ -8,7 +8,7 @@ from PIL import Image
 from megane.utils.image import prepare_input
 from megane.utils.masks import *
 from megane.utils.meanap import *
-from megane.utils.misc import *
+from megane.utils.misc import init_from_ns, save_args, with_batch_mode
 from megane.utils.polygons import *
 
 assert prepare_input
