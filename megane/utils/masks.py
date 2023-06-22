@@ -122,8 +122,7 @@ def mask_to_rrect(mask, open_kernel=None):
     else:
         bin_mask = mask
     bin_mask = (bin_mask * 255).astype("uint8")
-    cnts, _ = cv2.findContours(
-        bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     def should_square(rect):
         (x, y), (w, h), a = rect
@@ -163,11 +162,11 @@ def mask_to_polygons(mask):
         scores:
             Polygon scores based on the input mask.
     """
+    mask = np.tanh(mask * 50)
     height, width = mask.shape
-    bin_mask = mask > 0
+    bin_mask = mask > 0.2
     bin_mask = (bin_mask * 255).astype("uint8")
-    cnts, _ = cv2.findContours(
-        bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     polygons = []
     scores = []
