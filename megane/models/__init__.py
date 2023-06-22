@@ -13,6 +13,7 @@ class backbones:
         resnet_tiny_50,
     )
     from megane.models.backbone_mobilenet import afvit_t
+    from megane.models.backbone_vit import mvit_11, mvit_18
 
     # from .backbone_fpn import FPNBackbone as fpn
     # from .backbone_fvit import FViTBackbone as fvit
