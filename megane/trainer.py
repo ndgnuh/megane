@@ -165,6 +165,7 @@ class Trainer:
                 #     "sample-output.pt",
                 # )
                 b_idx = random.choice(range(images.shape[0]))
+                self.save_weight(self.latest_weight_path)
                 pr_sample = model.decode_sample(
                     batch_get_index(images, b_idx),
                     batch_get_index(outputs, b_idx),
