@@ -3,6 +3,14 @@ from typing import List
 
 import cv2
 import numpy as np
+from megane.utils.convert import xyxy2polygon
+
+
+def smooth(mask):
+    kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (5, 5))
+    blur = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    remask = blur > 0.2
+    return remask
 
 
 def find_score(mask, polygon):
@@ -120,7 +128,7 @@ def mask_to_rrect(mask, open_kernel=None):
         kernel = np.ones(open_kernel)
         bin_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     else:
-        bin_mask = mask
+        bin_mask = (mask > 0.5).astype("float32")
     bin_mask = (bin_mask * 255).astype("uint8")
     cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -162,16 +170,17 @@ def mask_to_polygons(mask):
         scores:
             Polygon scores based on the input mask.
     """
-    mask = np.tanh(mask * 50)
+    mask = smooth(mask)
     height, width = mask.shape
-    bin_mask = mask > 0.2
+    bin_mask = mask > 0.5
     bin_mask = (bin_mask * 255).astype("uint8")
     cnts, _ = cv2.findContours(bin_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     polygons = []
     scores = []
     for cnt in cnts:
-        eps = cv2.arcLength(cnt, True) * 0.01
+        cnt = cv2.convexHull(cnt)
+        eps = cv2.arcLength(cnt, True) * 0.05
         # Do this to avoid rounded corners
         cnt = cv2.approxPolyDP(cnt, eps, closed=False)
         cnt = cv2.approxPolyDP(cnt, eps, closed=True)
@@ -234,7 +243,7 @@ def draw_mask_v1(
     return mask
 
 
-def mask_to_box_v1(mask, min_score=0.5):
+def mask_to_rect(mask, min_score=0.5):
     """Convert a score mask to bounding boxes using connected component.
 
     Args:
@@ -271,7 +280,9 @@ def mask_to_box_v1(mask, min_score=0.5):
     m = mask.min()
     score_mask = (mask - m) / (M - m + 1e-6)
     for i, (x1, y1, x2, y2) in enumerate(boxes):
-        scores[i] = np.clip(score_mask[y1:y2, x1:x2].mean(), 0, 1)
+        aux = score_mask[y1:y2, x1:x2]
+        score_nz = aux[aux > 0]
+        scores[i] = np.clip(score_nz.mean(), 0, 1)
 
     # Expand boxes
     boxes = boxes.round().astype(int)
@@ -285,4 +296,7 @@ def mask_to_box_v1(mask, min_score=0.5):
     keep = scores >= min_score
     boxes = boxes[keep, :]
     scores = scores[keep]
+
+    # Convert box to polygon format
+    boxes = [xyxy2polygon(xyxy) for xyxy in boxes]
     return boxes, scores
