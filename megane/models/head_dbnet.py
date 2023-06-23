@@ -1,7 +1,4 @@
-from itertools import starmap
-
 # Reference: https://arxiv.org/abs/1911.08947
-import cv2
 import numpy as np
 import torch
 from torch import nn
@@ -10,98 +7,64 @@ from torchvision.transforms import functional as TF
 
 from megane import utils
 from megane.data import Sample
-from megane.models import api, losses
+from megane.models.api import ModelAPI
 
 
-def PredictionConv(hidden_size, num_classes: int = 1):
-    aux_size = hidden_size // 4
-    return nn.Sequential(
-        nn.Conv2d(hidden_size, aux_size, 3, padding=1),
-        nn.InstanceNorm2d(aux_size),
-        nn.ReLU(),
-        nn.ConvTranspose2d(aux_size, aux_size, kernel_size=2, stride=2),
-        nn.InstanceNorm2d(aux_size),
-        nn.ReLU(),
-        nn.ConvTranspose2d(aux_size, num_classes, kernel_size=2, stride=2),
-    )
+def generate_background(x, dim=-3, logit=False):
+    if logit:
+        x = torch.sigmoid(x)
+    bg = 1 - x.sum(dim=dim, keepdim=True)
+    bg = torch.clamp(bg, 1e-6, 1 - 1e-6)
+    if logit:
+        bg = torch.log(bg / (1 - bg))
+    return bg
 
 
-class DBNetFamily(api.ModelAPI):
-    """Family of prediction heads that uses shrink/expand polygons"""
+def with_background(x, dim=-3, logit=False):
+    bg = generate_background(x, dim=dim, logit=logit)
+    return torch.cat([bg, x], dim=dim)
 
-    def encode_sample(self, sample: Sample):
-        return encode_sample(
-            sample,
-            shrink_rate=self.shrink_rate,
-            image_size=self.image_size,
-            num_classes=self.num_classes,
+
+class PredictionConv(nn.Module):
+    def __init__(self, hidden_size: int, num_classes: int):
+        super().__init__()
+        aux_size = hidden_size // 4
+        self.conv_1 = nn.Sequential(
+            nn.Conv2d(hidden_size, aux_size, 3, padding=1),
+            nn.InstanceNorm2d(aux_size),
+            nn.ReLU(),
+        )
+        self.conv_2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                aux_size,
+                aux_size,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+            ),
+            nn.InstanceNorm2d(aux_size),
+            nn.ReLU()
+        )
+        self.conv_3 = nn.Sequential(
+            nn.ConvTranspose2d(aux_size, 3, kernel_size=4,
+                               stride=2, padding=1),
+            nn.Conv2d(3, 3, 3, padding=1, groups=3),
+            nn.Conv2d(3, num_classes, 1),
         )
 
-    @torch.no_grad()
-    def decode_sample(
-        self,
-        inputs,
-        outputs,
-        ground_truth: bool = False,
-    ) -> Sample:
-        """Return a sample from raw model outputs
-        Args:
-            inputs:
-                Model encoded input image of shape [3, H, W]
-            outputs:
-                Tuple of proba map and threshold map
-            sample:
-                The input sample, this is only used to get the image.
-            ground_truth:
-                Specify if this is decoded from the ground truth
+        self.proj = nn.Conv2d(hidden_size, aux_size, 1)
+        self.up = nn.Upsample(scale_factor=2)
 
-        Returns:
-            The decoded sample.
-        """
-        image = TF.to_pil_image(inputs)
-        probas = outputs[0].detach().cpu()
-
-        # Mask to polygons
-        if not ground_truth:
-            probas = torch.sigmoid(probas)
-
-        # For each classes
-        final_classes = []
-        final_polygons = []
-        final_scores = []
-        for class_idx, mask in enumerate(probas):
-            mask_size = self.image_size
-            boxes, scores = utils.mask_to_rrect(mask.numpy())
-            for polygon, score in zip(boxes, scores):
-                # Filter bounding boxes
-                if score < 0.5:
-                    continue
-                area = utils.polygon_area(polygon)
-                length = utils.polygon_perimeter(polygon)
-                if length == 0 or area == 0:
-                    continue
-
-                # Expand detected polygon
-                if self.expand_rate > 0:
-                    d = area * self.expand_rate / length
-                    polygon = utils.offset_polygon(polygon, d)
-                    polygon = np.clip(polygon, 0, mask_size)
-                polygon = [(x / mask_size, y / mask_size) for (x, y) in polygon]
-
-                # Append result
-                final_polygons.append(polygon)
-                final_scores.append(score)
-                final_classes.append(class_idx)
-
-        return Sample(
-            image=image,
-            boxes=final_polygons,
-            classes=final_classes,
-            scores=final_scores,
-        )
+    def forward(self, x):
+        res = self.proj(x)
+        x = self.conv_1(x) + res
+        res = self.up(res)
+        x = self.conv_2(x) + res
+        x = self.conv_3(x)
+        return x
 
 
-class DBNet(DBNetFamily):
+class DBNet(ModelAPI):
     def __init__(
         self,
         image_size: int,
@@ -115,7 +78,7 @@ class DBNet(DBNetFamily):
         utils.save_args()
 
         # 0 = background
-        self.probas = PredictionConv(hidden_size, num_classes + 1)
+        self.probas = PredictionConv(hidden_size, num_classes)
         # 0 = threshold
         self.thresholds = PredictionConv(hidden_size, num_classes)
 
@@ -127,46 +90,67 @@ class DBNet(DBNetFamily):
             thresholds = self.thresholds(features)
         return (probas, thresholds)
 
+    def db(self, P, T, k=50, logits=True):
+        x = k * (P - T)
+        if logits:
+            return torch.sigmoid(x)
+        else:
+            return x
+
     def compute_loss(self, outputs, targets):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
 
-        # Loss function
-        if self.num_classes == 1:
-            loss_fn = F.binary_cross_entropy_with_logits
-        else:
-            loss_fn = F.multilabel_soft_margin_loss
+        def bbce(pr, gt):
+            pos = gt > 0.2
+            neg = ~pos
+            if pos.count_nonzero() == 0 or neg.count_nonzero() == 0:
+                loss = F.cross_entropy(pr, gt)
+            else:
+                p_losses = F.cross_entropy(pr[pos], gt[pos])
+                n_losses = F.cross_entropy(pr[neg], gt[neg])
+                loss = (p_losses + n_losses) / 2
+            return loss
 
-        # Prepare
-        pr = torch.cat([pr_probas, pr_thresholds], dim=1)
-        gt = torch.cat([gt_probas, gt_thresholds], dim=1)
-        if self.num_classes > 1:
-            pr = pr.transpose(1, -1).reshape(-1, pr.size(1))
-            gt = gt.transpose(1, -1).reshape(-1, gt.size(1))
-        loss = loss_fn(pr, gt)
-
-        # Additional loss between the threshold and the proba
+        loss = 0
         count = 0
-        extra_loss = 0
+        l1 = F.l1_loss
         for i in range(self.num_classes):
-            pr_proba = pr_probas[:, i + 1]
+            # Prepare
+            pr_proba = pr_probas[:, i]
             pr_threshold = pr_thresholds[:, i]
-            gt_proba = gt_probas[:, i + 1]
+            gt_proba = gt_probas[:, i]
             gt_threshold = gt_thresholds[:, i]
-            pr_bg = torch.clamp(1 - pr_threshold - pr_proba, 0, 1)
-            gt_bg = torch.clamp(1 - gt_threshold - gt_proba, 0, 1)
-            pr = torch.stack([pr_bg, pr_threshold, pr_proba], dim=1)
-            gt = torch.stack([gt_bg, gt_threshold, gt_proba], dim=1)
-            extra_loss = extra_loss + F.cross_entropy(pr, gt)
 
-            # DB Loss
-            k = 50
-            pr = k * (gt_proba - gt_threshold)
-            gt = torch.sigmoid(k * (gt_proba - gt_threshold))
-            extra_loss = extra_loss + F.binary_cross_entropy_with_logits(pr, gt)
-            count = count + 1
+            # Full classification loss
+            pr = with_background(
+                torch.stack([pr_proba, pr_threshold], dim=1),
+                logit=True,
+            )
+            gt = with_background(
+                torch.stack([gt_proba, gt_threshold], dim=1),
+                logit=False,
+            )
+            loss += F.cross_entropy(pr, gt)
 
-        loss = loss + extra_loss / count / 2
+            # Binary map loss
+            # pr_bin = self.db(pr_proba, pr_threshold, logits=False)
+            # gt_bin = self.db(gt_proba, gt_threshold, logits=True)
+            # loss += F.binary_cross_entropy_with_logits(pr_bin, gt_bin)
+
+            # Proba map loss
+            pr = with_background(pr_proba.unsqueeze(1))
+            gt = with_background(gt_proba.unsqueeze(1))
+            loss += F.binary_cross_entropy_with_logits(pr, gt)
+
+            # Threshold map loss
+            pr = with_background(pr_threshold.unsqueeze(1))
+            gt = with_background(gt_threshold.unsqueeze(1))
+            loss += F.binary_cross_entropy_with_logits(pr, gt)
+
+            count = count + 4
+
+        loss = loss / count
         return loss
 
     def encode_sample(self, sample: Sample):
@@ -175,7 +159,8 @@ class DBNet(DBNetFamily):
         r = self.shrink_rate
 
         # Process inputs
-        image = utils.prepare_input(sample.image, sz, sz, resize_mode=self.resize_mode)
+        image = utils.prepare_input(
+            sample.image, sz, sz, resize_mode=self.resize_mode)
 
         # Process targets
         # Expand polygons
@@ -183,8 +168,10 @@ class DBNet(DBNetFamily):
         areas = map(utils.polygon_area, boxes)
         lengths = map(utils.polygon_perimeter, boxes)
         dists = [(1 - r**2) * A / (L + 1e-6) for (A, L) in zip(areas, lengths)]
-        expand_boxes = [utils.offset_polygon(b, d) for b, d in zip(boxes, dists)]
-        shrink_boxes = [utils.offset_polygon(b, -d) for b, d in zip(boxes, dists)]
+        expand_boxes = [utils.offset_polygon(
+            b, d) for b, d in zip(boxes, dists)]
+        shrink_boxes = [utils.offset_polygon(
+            b, -d) for b, d in zip(boxes, dists)]
 
         # Numpy makes it easy to filter
         shrink_boxes = np.array(shrink_boxes, dtype="object")
@@ -213,11 +200,10 @@ class DBNet(DBNetFamily):
         probas = np.stack(probas, axis=0)
         thresholds = np.stack(thresholds, axis=0)
 
-        # Make backgrounds
-        backgrounds = 1 - np.clip(probas.sum(axis=0), 0, 1)
-        probas = np.concatenate([backgrounds[None, ...], probas], axis=0)
-
         return image, (probas, thresholds)
+
+    def post_process(self, probas):
+        return torch.clamp(torch.tanh(probas * 50), 0, 1)
 
     @torch.no_grad()
     def visualize_outputs(
@@ -231,7 +217,7 @@ class DBNet(DBNetFamily):
         probas, thresholds = outputs
         images = torch.cat([probas, thresholds], dim=-3).cpu()
         if not ground_truth:
-            images = torch.sigmoid(images)
+            images = self.post_process(images * 50)
 
         images = utils.stack_image_batch(images)
         logger.add_image(tag, images, step)
@@ -243,13 +229,10 @@ class DBNet(DBNetFamily):
         # post process
         outputs = outputs[0].detach().cpu()
         if not ground_truth:
-            outputs = torch.softmax(outputs, dim=-3)
-
-        masks, classes = outputs.max(dim=-3)
+            outputs = self.post_process(outputs)
 
         #  adapt
-        masks = masks.numpy()
-        classes = classes.numpy()
+        masks = outputs.numpy()
 
         # decode
         final_classes = []
@@ -257,8 +240,7 @@ class DBNet(DBNetFamily):
         final_polygons = []
         r = self.expand_rate
         for class_idx in range(self.num_classes):
-            class_mask = classes == (class_idx + 1)
-            mask = masks * class_mask
+            mask = masks[class_idx]
             polygons, scores = utils.mask_to_polygons(mask)
             if r > 0:
                 areas = utils.polygon_area(polygons, batch=True)
