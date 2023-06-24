@@ -10,6 +10,32 @@ from megane.data import Sample
 from megane.models.api import ModelAPI
 
 
+class LayerNorm2d(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.norm = nn.LayerNorm(channels)
+
+    def forward(self, x):
+        x = x.transpose(1, -1)
+        x = self.norm(x)
+        x = x.transpose(1, -1)
+        return x
+
+
+def loss_mining(losses, mask, k=3):
+    positive = mask
+    negative = ~mask
+    num_positives = torch.count_nonzero(positive)
+    num_negatives = torch.count_nonzero(negative)
+    if num_positives == 0 or num_negatives == 0:
+        return losses.mean()
+
+    num_negatives = min(int(k * num_positives), num_negatives)
+    p_loss = torch.topk(losses[positive], num_positives).values.mean()
+    n_loss = torch.topk(losses[negative], num_negatives).values.mean()
+    return p_loss + n_loss
+
+
 def generate_background(x, dim=-3, logit=False):
     if logit:
         x = torch.sigmoid(x)
@@ -31,35 +57,32 @@ class PredictionConv(nn.Module):
         aux_size = hidden_size // 4
         self.conv_1 = nn.Sequential(
             nn.Conv2d(hidden_size, aux_size, 3, padding=1),
-            nn.InstanceNorm2d(aux_size),
+            LayerNorm2d(aux_size),
             nn.ReLU(),
         )
         self.conv_2 = nn.Sequential(
             nn.ConvTranspose2d(
                 aux_size,
                 aux_size,
-                kernel_size=4,
+                kernel_size=2,
                 stride=2,
-                padding=1,
             ),
-            nn.InstanceNorm2d(aux_size),
-            nn.ReLU()
+            LayerNorm2d(aux_size),
+            nn.ReLU(),
         )
-        self.conv_3 = nn.Sequential(
-            nn.ConvTranspose2d(aux_size, 3, kernel_size=4,
-                               stride=2, padding=1),
-            nn.Conv2d(3, 3, 3, padding=1, groups=3),
-            nn.Conv2d(3, num_classes, 1),
+        self.conv_3 = nn.ConvTranspose2d(
+            aux_size,
+            num_classes,
+            kernel_size=2,
+            stride=2,
         )
 
-        self.proj = nn.Conv2d(hidden_size, aux_size, 1)
-        self.up = nn.Upsample(scale_factor=2)
+        # self.proj = nn.Conv2d(hidden_size, aux_size, 1)
+        # self.up = nn.Upsample(scale_factor=2)
 
     def forward(self, x):
-        res = self.proj(x)
-        x = self.conv_1(x) + res
-        res = self.up(res)
-        x = self.conv_2(x) + res
+        x = self.conv_1(x)
+        x = self.conv_2(x)
         x = self.conv_3(x)
         return x
 
@@ -101,20 +124,19 @@ class DBNet(ModelAPI):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
 
-        def bbce(pr, gt):
-            pos = gt > 0.2
-            neg = ~pos
-            if pos.count_nonzero() == 0 or neg.count_nonzero() == 0:
-                loss = F.cross_entropy(pr, gt)
+        def dice_loss(pr, gt, reduction="mean"):
+            pr = torch.sigmoid(pr)
+            losses = 1 - (pr * gt * 2 + 1) / (pr + gt + 1)
+            if reduction == "mean":
+                return losses.mean()
+            elif reduction == "none":
+                return losses
             else:
-                p_losses = F.cross_entropy(pr[pos], gt[pos])
-                n_losses = F.cross_entropy(pr[neg], gt[neg])
-                loss = (p_losses + n_losses) / 2
-            return loss
+                raise NotImplementedError(f"Unknown reduction {reduction}")
 
         loss = 0
         count = 0
-        l1 = F.l1_loss
+        loss_fn = dice_loss
         for i in range(self.num_classes):
             # Prepare
             pr_proba = pr_probas[:, i]
@@ -122,33 +144,55 @@ class DBNet(ModelAPI):
             gt_proba = gt_probas[:, i]
             gt_threshold = gt_thresholds[:, i]
 
-            # Full classification loss
-            pr = with_background(
-                torch.stack([pr_proba, pr_threshold], dim=1),
-                logit=True,
+            # Training mask
+            proba_mask = (torch.sigmoid(pr_proba * 50) > 0.5) & (gt_proba > 0.2)
+            threshold_mask = (torch.sigmoid(pr_threshold * 50) > 0.5) & (
+                gt_threshold > 0.2
             )
-            gt = with_background(
-                torch.stack([gt_proba, gt_threshold], dim=1),
-                logit=False,
-            )
-            loss += F.cross_entropy(pr, gt)
 
-            # Binary map loss
-            # pr_bin = self.db(pr_proba, pr_threshold, logits=False)
-            # gt_bin = self.db(gt_proba, gt_threshold, logits=True)
-            # loss += F.binary_cross_entropy_with_logits(pr_bin, gt_bin)
+            # Full classification loss
+            # pr = with_background(
+            #     torch.stack([pr_proba, pr_threshold], dim=1),
+            #     logit=True,
+            # )
+            # gt = with_background(
+            #     torch.stack([gt_proba, gt_threshold], dim=1),
+            #     logit=False,
+            # )
+            # loss += F.cross_entropy(pr, gt)
+
+            # DB map loss
+            # Training mask is needed because the surrounding will be 0.5
+            pr_bin = self.db(pr_proba, pr_threshold, logits=False)
+            gt_bin = self.db(gt_proba, gt_threshold, logits=True)
+            training_mask = (gt_proba + gt_threshold) > 0
+            if torch.count_nonzero(training_mask) > 0:
+                pr = pr_bin[training_mask]
+                gt = gt_bin[training_mask]
+                loss += loss_fn(pr, gt)
+                # loss += torch.abs(pr_bin[~training_mask] - 0.5).mean()
+                # loss += torch.abs(pr_probas[~training_mask]).mean()
 
             # Proba map loss
-            pr = with_background(pr_proba.unsqueeze(1))
-            gt = with_background(gt_proba.unsqueeze(1))
-            loss += F.binary_cross_entropy_with_logits(pr, gt)
+            # pr = with_background(pr_proba.unsqueeze(1), logit=True)
+            # gt = with_background(gt_proba.unsqueeze(1))
+            pr = pr_proba
+            gt = gt_proba
+            loss += dice_loss(pr, gt)
+            # losses = loss_fn(pr, gt, reduction="none")
+            # loss += loss_mining(losses, proba_mask)
 
             # Threshold map loss
-            pr = with_background(pr_threshold.unsqueeze(1))
-            gt = with_background(gt_threshold.unsqueeze(1))
-            loss += F.binary_cross_entropy_with_logits(pr, gt)
+            # pr = with_background(pr_threshold.unsqueeze(1), logit=True)
+            # gt = with_background(gt_threshold.unsqueeze(1))
+            pr = pr_threshold
+            gt = gt_threshold
+            losses = F.smooth_l1_loss(torch.sigmoid(pr), gt, reduction="mean")
+            loss += losses * 10
+            # loss += loss_mining(losses, threshold_mask) * 10
+            # loss += F.l1_loss(torch.sigmoid(pr), gt, reduction="mean") * 10
 
-            count = count + 4
+            count = count + 1
 
         loss = loss / count
         return loss
@@ -159,8 +203,7 @@ class DBNet(ModelAPI):
         r = self.shrink_rate
 
         # Process inputs
-        image = utils.prepare_input(
-            sample.image, sz, sz, resize_mode=self.resize_mode)
+        image = utils.prepare_input(sample.image, sz, sz, resize_mode=self.resize_mode)
 
         # Process targets
         # Expand polygons
@@ -168,10 +211,8 @@ class DBNet(ModelAPI):
         areas = map(utils.polygon_area, boxes)
         lengths = map(utils.polygon_perimeter, boxes)
         dists = [(1 - r**2) * A / (L + 1e-6) for (A, L) in zip(areas, lengths)]
-        expand_boxes = [utils.offset_polygon(
-            b, d) for b, d in zip(boxes, dists)]
-        shrink_boxes = [utils.offset_polygon(
-            b, -d) for b, d in zip(boxes, dists)]
+        expand_boxes = [utils.offset_polygon(b, d) for b, d in zip(boxes, dists)]
+        shrink_boxes = [utils.offset_polygon(b, -d) for b, d in zip(boxes, dists)]
 
         # Numpy makes it easy to filter
         shrink_boxes = np.array(shrink_boxes, dtype="object")
@@ -241,7 +282,7 @@ class DBNet(ModelAPI):
         r = self.expand_rate
         for class_idx in range(self.num_classes):
             mask = masks[class_idx]
-            polygons, scores = utils.mask_to_polygons(mask)
+            polygons, scores = utils.mask_to_rect(mask)
             if r > 0:
                 areas = utils.polygon_area(polygons, batch=True)
                 lengths = utils.polygon_perimeter(polygons, batch=True)
