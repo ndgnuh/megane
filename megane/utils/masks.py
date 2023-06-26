@@ -41,7 +41,7 @@ def find_score(mask, polygon):
         >>> score = find_score(mask, polygon)
     """
     raster = np.zeros_like(mask, dtype="float32")
-    raster = cv2.fillConvexPoly(raster, polygon.astype(int), 1)
+    raster = cv2.fillPoly(raster, [polygon.astype(int)], 1)
     scores = mask * raster
     return scores.sum() / np.count_nonzero(scores)
 
@@ -79,8 +79,8 @@ def draw_threshold_mask(
         # Draw to a canvas first
         # and then fill the inner box with background
         canvas = np.zeros_like(mask)
-        canvas = cv2.fillConvexPoly(canvas, np.array(outer_box).astype(int), 1)
-        canvas = cv2.fillConvexPoly(canvas, np.array(inner_box).astype(int), 0)
+        canvas = cv2.fillPoly(canvas, [np.array(outer_box).astype(int)], 1, cv2.LINE_AA)
+        canvas = cv2.fillPoly(canvas, [np.array(inner_box).astype(int)], 0, cv2.LINE_AA)
         # yank the canvas to the threshold map
         mask = mask + canvas
     # Normalize threshold map to 0..1
@@ -105,7 +105,7 @@ def draw_mask(width: int, height: int, polygons: np.ndarray):
     # mask_to_box
     mask = np.zeros((height, width), dtype="float32")
     for polygon in polygons:
-        mask = cv2.fillConvexPoly(mask, np.array(polygon).astype(int), 1)
+        mask = cv2.fillPoly(mask, [np.array(polygon).astype(int)], 1, cv2.LINE_AA)
     return mask
 
 
