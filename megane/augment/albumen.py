@@ -123,13 +123,13 @@ def default_transform(prob, background_images, domain_images):
             p=prob,
         ),
         # Geometric transform/rotate
-        A.OneOf(
-            [
-                A.Perspective(fit_output=True),
-                A.SafeRotate((-180, 180), border_mode=cv2.BORDER_CONSTANT),
-            ],
-            p=prob,
-        )
+        # A.OneOf(
+        #     [
+        #         A.Perspective(fit_output=True),
+        #         A.SafeRotate((-180, 180), border_mode=cv2.BORDER_CONSTANT),
+        #     ],
+        #     p=prob,
+        # )
         # A.OneOf(
         #     [
         #         A.Affine(
@@ -159,5 +159,5 @@ def default_transform(prob, background_images, domain_images):
         transformations.append(domain_transforms)
     return A.Compose(
         transformations,
-        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
+        # keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
     )

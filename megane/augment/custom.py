@@ -37,7 +37,7 @@ class ReplaceBackground:
 
         # Replace background
         image = replace_background(sample.image, bg, sample.boxes)
-        sample.image.close()
+        # sample.image.close()
         bg.close()
 
         # Replace image

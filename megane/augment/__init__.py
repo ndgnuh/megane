@@ -1,4 +1,6 @@
 import random
+import numpy as np
+from PIL import Image
 
 from megane.augment import albumen as A
 from megane.augment import custom as CA
@@ -27,14 +29,8 @@ class Augmentation:
             self.custom_transform = lambda x: x
 
     def __call__(self, sample: Sample) -> Sample:
-        if random.choice((True, False)):
-            enc = A.encode(sample)
-            enc = self.albumen_transform(**enc)
-            dec = A.decode(sample, enc)
-            dec = self.custom_transform(dec)
-        else:
-            sample = self.custom_transform(sample)
-            enc = A.encode(sample)
-            enc = self.albumen_transform(**enc)
-            dec = A.decode(sample, enc)
-        return dec
+        sample = self.custom_transform(sample)
+        image = np.array(sample.image)
+        augmented = self.albumen_transform(image=image)
+        sample.image = Image.fromarray(augmented["image"])
+        return sample
