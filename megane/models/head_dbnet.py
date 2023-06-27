@@ -34,6 +34,10 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4):
     proba_maps = np.zeros((num_classes, H, W), dtype="float32")
     threshold_maps = np.zeros((num_classes, H, W), dtype="float32")
 
+    # Negative sample
+    if len(classes) == 0:
+        return proba_maps, threshold_maps
+
     boxes = np.array(sample.boxes, dtype="float32")
     boxes[..., 0] *= W
     boxes[..., 1] *= H
