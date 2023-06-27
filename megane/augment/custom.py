@@ -56,7 +56,7 @@ class ReplaceNegative:
 
         bg = random.choice(self.background_images)
         bg = Image.open(bg)
-        return Sample(image=bg)
+        return Sample(image=bg.convert("RGB"))
 
 
 @dataclass
