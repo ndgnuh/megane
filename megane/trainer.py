@@ -17,6 +17,14 @@ from megane.models import Model, ModelAPI
 from megane.utils import compute_maf1
 
 
+def load_weights(model, weights):
+    for name, params in model.named_parameters():
+        if not name in weights:
+            continue
+        if weights[name].shape == params.shape:
+            params.data = weights[name]
+
+
 def batch_get_index(batch, i: int):
     if isinstance(batch, torch.Tensor):
         return batch[i]
@@ -73,9 +81,9 @@ class Trainer:
         self.model: ModelAPI = Model(model_config)
         print(self.model)
         if model_config.continue_weight:
-            self.model.load_state_dict(
+            load_weights(
+                self.model,
                 torch.load(model_config.continue_weight, map_location="cpu"),
-                strict=False,
             )
         # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
