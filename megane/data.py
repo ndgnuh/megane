@@ -5,6 +5,7 @@ from functools import lru_cache
 from os import path
 from typing import Callable, List, Optional, Tuple
 
+import cv2
 import numpy as np
 from PIL import Image, ImageDraw
 from torch.utils.data import Dataset
@@ -35,6 +36,7 @@ class Sample:
 
     def __post_init__(self):
         # Validate
+        self.image = self.image.convert("RGB")
         for box in self.boxes:
             box = np.array(box)
             assert (
@@ -114,14 +116,14 @@ def load_sample_labelme(sample_path, classes, single_class: bool):
             x2 = x2 / width
             y2 = y2 / height
             poly = [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
-            boxes.append(poly)
         elif shape["shape_type"] == "polygon":
             # xs = [x / width for (x, y) in shape["points"]]
             # ys = [y / height for (x, y) in shape["points"]]
             poly = [(x / width, y / height) for (x, y) in shape["points"]]
-            boxes.append(poly)
         else:
             continue
+        poly = cv2.boxPoints(cv2.minAreaRect(np.array(poly, dtype="float32")))
+        boxes.append(poly)
 
         if single_class:
             class_indices.append(0)
