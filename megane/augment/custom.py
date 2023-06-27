@@ -68,5 +68,5 @@ class OneOf:
         if random.uniform(0, 1) > self.p:
             return sample
         weights = [t.p for t in self.transforms]
-        transform = random.choices(self.transforms, weights, k=1)
+        transform = random.choices(self.transforms, weights, k=1)[0]
         return transform(sample)
