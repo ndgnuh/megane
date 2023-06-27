@@ -58,7 +58,7 @@ class Sample:
             "#81a2be",
             "#b294bb",
             "#8abeb7",
-            "#c5c8c6"
+            "#c5c8c6",
         ]
         image = self.image.copy()
         w, h = image.size
