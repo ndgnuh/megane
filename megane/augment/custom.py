@@ -59,6 +59,7 @@ class ReplaceNegative:
         return Sample(image=bg)
 
 
+@dataclass
 class OneOf:
     tranforms: List[Callable]
     p: float = 0.5
