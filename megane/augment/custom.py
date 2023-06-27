@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass
-from typing import List
+from typing import List, Callable
 
 import numpy as np
 from lenses import bind
@@ -43,3 +43,29 @@ class ReplaceBackground:
         # Replace image
         new_sample = bind(sample).GetAttr("image").set(image)
         return new_sample
+
+
+@dataclass
+class ReplaceNegative:
+    background_images: List[str]
+    p: float = 0.5
+
+    def __call__(self, sample):
+        if random.uniform(0, 1) > self.p:
+            return sample
+
+        bg = random.choice(self.background_images)
+        bg = Image.open(bg)
+        return Sample(image=bg)
+
+
+class OneOf:
+    tranforms: List[Callable]
+    p: float = 0.5
+
+    def __call__(self, sample):
+        if random.uniform(0, 1) > self.p:
+            return sample
+        weights = [t.p for t in self.tranforms]
+        transform = random.choices(self.transforms, weights, k=1)
+        return transform(sample)

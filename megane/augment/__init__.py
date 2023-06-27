@@ -21,9 +21,16 @@ class Augmentation:
             domain_images=domain_images,
         )
         if len(background_images) > 0:
-            self.custom_transform = CA.ReplaceBackground(
+            self.custom_transform = CA.OneOf(
+                [
+                    CA.ReplaceBackground(
+                        background_images=background_images,
+                    ),
+                    CA.ReplaceNegative(
+                        background_images=background_images,
+                    ),
+                ],
                 p=prob,
-                background_images=background_images,
             )
         else:
             self.custom_transform = lambda x: x
