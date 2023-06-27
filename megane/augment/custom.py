@@ -61,7 +61,7 @@ class ReplaceNegative:
 
 @dataclass
 class OneOf:
-    tranforms: List[Callable]
+    transforms: List[Callable]
     p: float = 0.5
 
     def __call__(self, sample):
