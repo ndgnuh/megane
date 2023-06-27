@@ -1,13 +1,63 @@
 # Reference: https://arxiv.org/abs/1911.08947
+import cv2
 import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
 
+from lenses import bind
 from megane import utils
 from megane.data import Sample
 from megane.models.api import ModelAPI
+
+
+def shrink_dist(w, h, r):
+    A = w * h
+    L = (w + h) * 2
+    d = A / L * (1 - r**2)
+    return d
+
+
+def expand_dist(w, h, r):
+    A = w * h
+    L = (w + h) * 2
+    d = A * r / L
+    return d
+
+
+def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4):
+    boxes = sample.boxes
+    W, H = sample.image.size
+    classes = sample.classes
+
+    proba_maps = np.zeros((num_classes, H, W), dtype="float32")
+    threshold_maps = np.zeros((num_classes, H, W), dtype="float32")
+
+    boxes = np.array(sample.boxes, dtype="float32")
+    boxes[..., 0] *= W
+    boxes[..., 1] *= H
+
+    for box, cls in zip(boxes, classes):
+        rect = cv2.minAreaRect(box)
+        (x, y), (w, h), a = rect
+
+        d = shrink_dist(w, h, r=r)
+        ebox = cv2.boxPoints([(x, y), (w + d, h + d), a]).astype(int)
+        sbox = cv2.boxPoints([(x, y), (w - d, h - d), a]).astype(int)
+
+        # Probamap draw
+        cv2.fillConvexPoly(proba_maps[cls], sbox, 1)
+
+        # Threshold map draw
+        canvas = np.zeros_like(threshold_maps[cls])
+        canvas = cv2.fillConvexPoly(canvas, ebox, 1)
+        canvas = cv2.fillConvexPoly(canvas, sbox, 0)
+        # canvas = cv2.distanceTransform(canvas.astype("uint8"), cv2.DIST_L2, 5)
+        threshold_maps[cls] = threshold_maps[cls] + canvas
+
+    threshold_maps = np.clip(threshold_maps, 0, 1)
+    return proba_maps, threshold_maps
 
 
 class LayerNorm2d(nn.Module):
@@ -188,7 +238,7 @@ class DBNet(ModelAPI):
             # gt = with_background(gt_threshold.unsqueeze(1))
             pr = pr_threshold
             gt = gt_threshold
-            losses = F.smooth_l1_loss(torch.sigmoid(pr), gt, reduction="mean")
+            losses = F.l1_loss(torch.sigmoid(pr), gt, reduction="mean")
             loss += losses * 10
             # loss += loss_mining(losses, threshold_mask) * 10
             # loss += F.l1_loss(torch.sigmoid(pr), gt, reduction="mean") * 10
@@ -201,48 +251,11 @@ class DBNet(ModelAPI):
     def encode_sample(self, sample: Sample):
         sz = self.image_size
         num_classes = self.num_classes
-        r = self.shrink_rate
-
-        # Process inputs
-        image = utils.prepare_input(sample.image, sz, sz, resize_mode=self.resize_mode)
-
-        # Process targets
-        # Expand polygons
-        boxes = utils.denormalize_polygon(sample.boxes, sz, sz, batch=True)
-        areas = map(utils.polygon_area, boxes)
-        lengths = map(utils.polygon_perimeter, boxes)
-        dists = [(1 - r**2) * A / (L + 1e-6) for (A, L) in zip(areas, lengths)]
-        expand_boxes = [utils.offset_polygon(b, d) for b, d in zip(boxes, dists)]
-        shrink_boxes = [utils.offset_polygon(b, -d) for b, d in zip(boxes, dists)]
-
-        # Numpy makes it easy to filter
-        shrink_boxes = np.array(shrink_boxes, dtype="object")
-        expand_boxes = np.array(expand_boxes, dtype="object")
-        classes = np.array(sample.classes, dtype="object")
-
-        # Draw target masks
-        probas = []
-        thresholds = []
-        for class_idx in range(num_classes):
-            # Filter boxes by classes
-            class_mask = class_idx == classes
-            expand_boxes_c = expand_boxes[class_mask]
-            shrink_boxes_c = shrink_boxes[class_mask]
-
-            # Draw masks
-            proba = utils.draw_mask(sz, sz, shrink_boxes_c)
-            thresh = utils.draw_mask(sz, sz, expand_boxes_c) - proba
-            thresh = np.clip(thresh, 0, 1)
-
-            # Add result
-            probas.append(proba)
-            thresholds.append(thresh)
-
-        # Stack
-        probas = np.stack(probas, axis=0)
-        thresholds = np.stack(thresholds, axis=0)
-
-        return image, (probas, thresholds)
+        shrink_rate = self.shrink_rate
+        sample = bind(sample).image.set(sample.image.resize([sz, sz]))
+        image = utils.prepare_input(sample.image, sz, sz, self.resize_mode)
+        targets = encode_dbnet(sample, num_classes, shrink_rate)
+        return image, targets
 
     def post_process(self, probas):
         return torch.clamp(torch.tanh(probas * 50), 0, 1)
