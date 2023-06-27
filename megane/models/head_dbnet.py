@@ -56,8 +56,8 @@ class PredictionConv(nn.Module):
         super().__init__()
         aux_size = hidden_size // 4
         self.conv_1 = nn.Sequential(
-            nn.Conv2d(hidden_size, aux_size, 3, padding=1),
-            LayerNorm2d(aux_size),
+            nn.Conv2d(hidden_size, aux_size, 3, padding=1, bias=False),
+            nn.InstanceNorm2d(aux_size),
             nn.ReLU(),
         )
         self.conv_2 = nn.Sequential(
@@ -66,8 +66,9 @@ class PredictionConv(nn.Module):
                 aux_size,
                 kernel_size=2,
                 stride=2,
+                bias=False,
             ),
-            LayerNorm2d(aux_size),
+            nn.InstanceNorm2d(aux_size),
             nn.ReLU(),
         )
         self.conv_3 = nn.ConvTranspose2d(
