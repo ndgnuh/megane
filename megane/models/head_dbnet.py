@@ -64,6 +64,44 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4):
     return proba_maps, threshold_maps
 
 
+def _compute_score(proba_map, rect):
+    canvas = np.zeros_like(proba_map, dtype="float32")
+    poly = cv2.boxPoints(rect)
+    canvas = cv2.fillConvexPoly(canvas, poly.astype(int), 1)
+    score_map = canvas * proba_map
+    score = score_map.sum() / np.count_nonzero(score_map)
+    return score
+
+
+def decode_dbnet(proba_maps, expand_rate: float = 1.5):
+    C, H, W = proba_maps.shape
+
+    classes = []
+    scores = []
+    boxes = []
+    for cls, proba_map in enumerate(proba_maps):
+        mask = (proba_map > 0.2).astype("uint8")
+        cnts, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in cnts:
+            if cv2.contourArea(cnt) < 10:
+                continue
+            rect = cv2.minAreaRect(cnt)
+            score = _compute_score(proba_map, rect)
+
+            (x, y), (w, h), a = rect
+            d = expand_dist(w, h, expand_rate)
+            box = cv2.boxPoints([(x, y), (w + d, h + d), a])
+
+            boxes.append(box)
+            scores.append(score)
+            classes.append(cls)
+
+    boxes = np.stack(boxes, axis=0)
+    boxes[..., 0] /= W
+    boxes[..., 1] /= H
+    return boxes, classes, scores
+
+
 class LayerNorm2d(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -262,7 +300,7 @@ class DBNet(ModelAPI):
         return image, targets
 
     def post_process(self, probas):
-        return torch.clamp(torch.tanh(probas * 50), 0, 1)
+        return torch.sigmoid(probas)
 
     @torch.no_grad()
     def visualize_outputs(
@@ -283,41 +321,20 @@ class DBNet(ModelAPI):
 
     @torch.no_grad()
     def decode_sample(self, inputs, outputs, ground_truth: bool = False):
-        image = TF.to_pil_image(inputs.detach().cpu())
-
         # post process
         outputs = outputs[0].detach().cpu()
         if not ground_truth:
             outputs = self.post_process(outputs)
 
-        #  adapt
-        masks = outputs.numpy()
-
-        # decode
-        final_classes = []
-        final_scores = []
-        final_polygons = []
-        r = self.expand_rate
-        for class_idx in range(self.num_classes):
-            mask = masks[class_idx]
-            polygons, scores = utils.mask_to_rect(mask)
-            if r > 0:
-                areas = utils.polygon_area(polygons, batch=True)
-                lengths = utils.polygon_perimeter(polygons, batch=True)
-                dists = [A * r / L for (A, L) in zip(areas, lengths)]
-                polygons = [
-                    utils.offset_polygon(p, d) for (p, d) in zip(polygons, dists)
-                ]
-
-            final_polygons.extend(polygons)
-            final_classes.extend([class_idx] * len(polygons))
-            final_scores.extend(scores)
-
-        # output sample
+        image = TF.to_pil_image(inputs.detach().cpu())
+        boxes, classes, scores = decode_dbnet(
+            outputs.numpy(),
+            self.expand_rate,
+        )
         sample = Sample(
             image=image,
-            boxes=final_polygons,
-            scores=final_scores,
-            classes=final_classes,
+            boxes=boxes.tolist(),
+            classes=classes,
+            scores=scores,
         )
         return sample
