@@ -28,7 +28,6 @@ class necks:
 
 class heads:
     from megane.models.head_dbnet import DBNet as dbnet
-    from megane.models.head_segm import SegmentHead as segment
 
 
 class Model(nn.Module):
