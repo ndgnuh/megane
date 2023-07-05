@@ -204,3 +204,7 @@ class TextDetectionDataset(Dataset):
         )
         sample = self.transform(sample)
         return sample
+
+
+def get_dataset(*a, **k):
+    return TextDetectionDataset(*a, **k)
