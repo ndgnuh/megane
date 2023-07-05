@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from megane.augment import Augmentation
 from megane.configs import ModelConfig, TrainConfig
-from megane.data import TextDetectionDataset
+from megane.data import get_dataset
 from megane.models import Model, ModelAPI
 from megane.utils import compute_maf1
 
@@ -107,7 +107,7 @@ class Trainer:
 
             else:
                 transform = self.model.encode_sample
-            data = TextDetectionDataset(
+            data = get_dataset(
                 data,
                 classes=model_config.classes,
                 transform=transform,
