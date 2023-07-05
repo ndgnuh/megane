@@ -14,7 +14,7 @@ from megane.augment import Augmentation
 from megane.configs import ModelConfig, TrainConfig
 from megane.data import get_dataset
 from megane.models import Model, ModelAPI
-from megane.utils import compute_maf1
+from megane.utils import compute_maf1, TimeoutException, time_limit
 
 
 def load_weights(model, weights):
@@ -174,17 +174,8 @@ class Trainer:
                 # )
                 b_idx = random.choice(range(images.shape[0]))
                 self.save_weight(self.latest_weight_path)
-                pr_sample = model.decode_sample(
-                    batch_get_index(images, b_idx),
-                    batch_get_index(outputs, b_idx),
-                )
-                gt_sample = model.decode_sample(
-                    batch_get_index(images, b_idx),
-                    batch_get_index(targets, b_idx),
-                    ground_truth=True,
-                )
-                logger.add_image("train/sample-pr", pr_sample.visualize_tensor(), step)
-                logger.add_image("train/sample-gt", gt_sample.visualize_tensor(), step)
+
+                # Model activate visualization
                 model.visualize_outputs(
                     outputs,
                     logger=logger,
@@ -199,6 +190,37 @@ class Trainer:
                     step=step,
                     ground_truth=True,
                 )
+
+                # Decode and visualize ground truth
+                gt_sample = model.decode_sample(
+                    batch_get_index(images, b_idx),
+                    batch_get_index(targets, b_idx),
+                    ground_truth=True,
+                )
+                logger.add_image(
+                    "train/sample-gt",
+                    gt_sample.visualize_tensor(),
+                    step,
+                )
+
+                # Flush while we wait for the sampe prediction decode
+                logger.flush()
+
+                try:
+                    # Put on a timer because they tends to get really long at first
+                    with time_limit(5):
+                        # Decode and visualize prediction
+                        pr_sample = model.decode_sample(
+                            batch_get_index(images, b_idx),
+                            batch_get_index(outputs, b_idx),
+                        )
+                        logger.add_image(
+                            "train/sample-pr",
+                            pr_sample.visualize_tensor(),
+                            step,
+                        )
+                except TimeoutException:
+                    pass
                 logger.flush()
 
             if step % validate_every == 0:
