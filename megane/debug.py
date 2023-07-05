@@ -7,7 +7,7 @@ from functools import wraps
 logger = logging.getLogger("megane-debug")
 handler = logging.StreamHandler(sys.stdout)
 logger.setLevel(logging.DEBUG)
-logger.addHandler(logger)
+logger.addHandler(handler)
 formatter = logging.Formatter()
 
 
