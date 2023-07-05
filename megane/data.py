@@ -122,7 +122,6 @@ def load_sample_labelme(sample_path, classes, single_class: bool):
             poly = [(x / width, y / height) for (x, y) in shape["points"]]
         else:
             continue
-        poly = cv2.boxPoints(cv2.minAreaRect(np.array(poly, dtype="float32")))
         boxes.append(poly)
 
         if single_class:

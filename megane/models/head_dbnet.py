@@ -10,6 +10,9 @@ from lenses import bind
 from megane import utils
 from megane.data import Sample
 from megane.models.api import ModelAPI
+from megane.debug import with_timer
+import simpoly
+from shapely.geometry import Polygon
 
 
 def shrink_dist(w, h, r):
@@ -26,6 +29,7 @@ def expand_dist(w, h, r):
     return d
 
 
+# @with_timer
 def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4):
     boxes = sample.boxes
     W, H = sample.image.size
@@ -34,32 +38,32 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4):
     proba_maps = np.zeros((num_classes, H, W), dtype="float32")
     threshold_maps = np.zeros((num_classes, H, W), dtype="float32")
 
+    boxes = [[(x * W, y * H) for (x, y) in box] for box in boxes]
+
     # Negative sample
     if len(classes) == 0:
         return proba_maps, threshold_maps
 
-    boxes = np.array(sample.boxes, dtype="float32")
-    boxes[..., 0] *= W
-    boxes[..., 1] *= H
+    canvas = np.zeros((H, W), dtype="float32")
+    for xy, cls in zip(boxes, classes):
+        box = xy
+        d = simpoly.get_shrink_dist(box, r)
+        sbox = np.array(simpoly.offset(box, d), dtype=int)
+        ebox = np.array(simpoly.offset(box, -d), dtype=int)
 
-    for box, cls in zip(boxes, classes):
-        rect = cv2.minAreaRect(box)
-        (x, y), (w, h), a = rect
-
-        d = shrink_dist(w, h, r=r)
-        ebox = cv2.boxPoints([(x, y), (w + d, h + d), a]).astype(int)
-        sbox = cv2.boxPoints([(x, y), (w - d, h - d), a]).astype(int)
-
-        # Probamap draw
+        # Draw probability map
         cv2.fillConvexPoly(proba_maps[cls], sbox, 1)
 
         # Threshold map draw
-        canvas = np.zeros_like(threshold_maps[cls])
+        # Draw through a canvas
         canvas = cv2.fillConvexPoly(canvas, ebox, 1)
         canvas = cv2.fillConvexPoly(canvas, sbox, 0)
-        # canvas = cv2.distanceTransform(canvas.astype("uint8"), cv2.DIST_L2, 5)
-        threshold_maps[cls] = threshold_maps[cls] + canvas
+        threshold_maps[cls] += canvas
 
+        # clear canvas
+        canvas = cv2.fillConvexPoly(canvas, ebox, 0)
+
+    proba_maps = np.clip(proba_maps, 0, 1)
     threshold_maps = np.clip(threshold_maps, 0, 1)
     return proba_maps, threshold_maps
 
@@ -83,22 +87,24 @@ def decode_dbnet(proba_maps, expand_rate: float = 1.5):
         mask = (proba_map > 0.2).astype("uint8")
         cnts, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         for cnt in cnts:
-            if cv2.contourArea(cnt) < 10:
+            A = cv2.contourArea(cnt)
+            L = cv2.arcLength(cnt, True)
+            D = abs(A * expand_rate / (L + 1e-3))
+            if D == 0:
                 continue
-            rect = cv2.minAreaRect(cnt)
-            score = _compute_score(proba_map, rect)
 
-            (x, y), (w, h), a = rect
-            d = expand_dist(w, h, expand_rate)
-            box = cv2.boxPoints([(x, y), (w + d, h + d), a])
+            # cnt = cv2.approxPolyDP(cnt, L * 0.01, True)
+            box = cnt[:, 0, :].tolist()
+            box = simpoly.offset(box, D)
+            box = simpoly.scale_from(box, W, H)
+            score = 0.5
 
             boxes.append(box)
             scores.append(score)
             classes.append(cls)
 
-    boxes = np.stack(boxes, axis=0)
-    boxes[..., 0] /= W
-    boxes[..., 1] /= H
+    # boxes[..., 0] /= W
+    # boxes[..., 1] /= H
     return boxes, classes, scores
 
 
@@ -238,10 +244,10 @@ class DBNet(ModelAPI):
             gt_threshold = gt_thresholds[:, i]
 
             # Training mask
-            proba_mask = (torch.sigmoid(pr_proba * 50) > 0.5) & (gt_proba > 0.2)
-            threshold_mask = (torch.sigmoid(pr_threshold * 50) > 0.5) & (
-                gt_threshold > 0.2
-            )
+            # proba_mask = (torch.sigmoid(pr_proba * 50) > 0.5) & (gt_proba > 0.2)
+            # threshold_mask = (torch.sigmoid(pr_threshold * 50) > 0.5) & (
+            #     gt_threshold > 0.2
+            # )
 
             # Full classification loss
             # pr = with_background(
@@ -333,7 +339,7 @@ class DBNet(ModelAPI):
         )
         sample = Sample(
             image=image,
-            boxes=boxes.tolist(),
+            boxes=boxes,
             classes=classes,
             scores=scores,
         )
