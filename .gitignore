@@ -1,3 +1,7 @@
+*.ipynb
+*.pt
+*.png
+*.jpg
 configs/*
 data/*
 logs/*
