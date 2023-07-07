@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import torch
+import simpoly
 from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
@@ -11,8 +12,6 @@ from megane import utils
 from megane.data import Sample
 from megane.models.api import ModelAPI
 from megane.debug import with_timer
-import simpoly
-from shapely.geometry import Polygon
 
 
 def shrink_dist(w, h, r):
