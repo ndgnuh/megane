@@ -302,7 +302,6 @@ class Trainer:
                 targets = targets.cpu()
             elif isinstance(targets, (tuple, list)):
                 targets = [out.cpu() for out in targets]
-            targets = targets.cpu()
             images = images.cpu()
 
             # Inference output
