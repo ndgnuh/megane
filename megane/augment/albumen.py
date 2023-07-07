@@ -41,7 +41,10 @@ def encode(sample: Sample):
         keypoints.extend(polygon)
         masks.extend([i] * len(polygon))
 
-    assert max(masks) == len(classes) - 1
+    if len(masks) > 0:
+        assert max(masks) == len(classes) - 1
+    else:
+        assert len(classes) == 0
     return dict(image=image, keypoints=keypoints, box_mapping=masks, classes=classes)
 
 
