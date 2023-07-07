@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw
 from torch.utils.data import Dataset
+from pyrsistent import pvector
 
 from megane import utils
 
@@ -30,9 +31,9 @@ class Sample:
     """
 
     image: Image
-    boxes: List[List[Tuple[float, float]]] = field(default_factory=list)
-    classes: List[int] = field(default_factory=list)
-    scores: Optional[List[float]] = None
+    boxes: pvector[pvector[pvector[float]]] = field(default_factory=pvector)
+    classes: pvector[int] = field(default_factory=pvector)
+    scores: Optional[pvector[float]] = None
 
     def __post_init__(self):
         # Validate
@@ -106,8 +107,8 @@ def load_sample_labelme(sample_path, classes, single_class: bool):
     image_path = data["imagePath"]
     image_data = data["imageData"]
 
-    boxes = []
-    class_indices = []
+    boxes = pvector()
+    class_indices = pvector()
     for shape in shapes:
         if shape["shape_type"] == "rectangle":
             [x1, y1], [x2, y2] = shape["points"]
@@ -122,14 +123,14 @@ def load_sample_labelme(sample_path, classes, single_class: bool):
             poly = [(x / width, y / height) for (x, y) in shape["points"]]
         else:
             continue
-        boxes.append(poly)
+        boxes = boxes.append(poly)
 
         if single_class:
-            class_indices.append(0)
+            class_indices = class_indices.append(0)
         else:
             assert shape["label"] in classes, f"Unknown class {shape['label']}"
             class_idx = classes.index(shape["label"])
-            class_indices.append(class_idx)
+            class_indices = class_indices.append(class_idx)
 
     assert len(class_indices) == len(boxes)
 

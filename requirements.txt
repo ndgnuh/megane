@@ -1,3 +1,4 @@
+pyrsistent
 numpy
 torch
 torchvision
