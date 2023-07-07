@@ -28,11 +28,11 @@ def generate_fgsm_example(model, images, targets):
     loss.backward()
 
     # Perturbation level
-    epsilon = random.uniform(0.01, 0.1)
+    epsilon = random.uniform(0.01, 0.15)
     delta = epsilon * delta.grad.detach().sign()
 
     # FGSM Example
-    perturbed_images = images + delta
+    perturbed_images = torch.clamp(images + delta, 0, 1)
     return perturbed_images
 
 
@@ -298,8 +298,12 @@ class Trainer:
                 outputs = outputs.cpu()
             elif isinstance(outputs, (tuple, list)):
                 outputs = [out.cpu() for out in outputs]
-            images = images.cpu()
+            if isinstance(targets, torch.Tensor):
+                targets = targets.cpu()
+            elif isinstance(targets, (tuple, list)):
+                targets = [out.cpu() for out in targets]
             targets = targets.cpu()
+            images = images.cpu()
 
             # Inference output
             for i in range(images.shape[0]):
