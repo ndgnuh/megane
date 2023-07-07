@@ -28,7 +28,7 @@ def generate_fgsm_example(model, images, targets):
     loss.backward()
 
     # Perturbation level
-    epsilon = random.uniform(0.01, 0.15)
+    epsilon = random.uniform(1 / 255, 8 / 255)
     delta = epsilon * delta.grad.detach().sign()
 
     # FGSM Example
@@ -109,6 +109,8 @@ class Trainer:
             self.optimizer,
             max_lr=train_config.lr,
             total_steps=train_config.total_steps,
+            div_factor=10,
+            pct_start=0.1,
         )
 
         # Dataloader
