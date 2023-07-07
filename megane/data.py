@@ -31,9 +31,9 @@ class Sample:
     """
 
     image: Image
-    boxes: pvector[pvector[pvector[float]]] = field(default_factory=pvector)
+    boxes: pvector = field(default_factory=pvector)
     classes: pvector[int] = field(default_factory=pvector)
-    scores: Optional[pvector[float]] = None
+    scores: Optional[pvector] = None
 
     def __post_init__(self):
         # Validate
