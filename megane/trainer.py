@@ -18,6 +18,24 @@ from megane.models import Model, ModelAPI
 from megane.utils import compute_maf1, TimeoutException, time_limit
 
 
+def generate_fgsm_example(model, images, targets):
+    model.train()
+
+    # Generating the fgsm attack
+    delta = torch.zeros_like(images, device=images.device, requires_grad=True)
+    outputs = model(images + delta)
+    loss = model.compute_loss(outputs, targets)
+    loss.backward()
+
+    # Perturbation level
+    epsilon = random.uniform(0.01, 0.1)
+    delta = epsilon * delta.grad.detach().sign()
+
+    # FGSM Example
+    perturbed_images = images + delta
+    return perturbed_images
+
+
 def load_weights(model, weights):
     for name, params in model.named_parameters():
         if not name in weights:
@@ -160,6 +178,10 @@ class Trainer:
         pbar = loop_loader(dataloader, total_steps)
         pbar = tqdm(pbar, "Training", total=total_steps)
         for step, (images, targets) in pbar:
+            optimizer.zero_grad()
+            if random.choice((True, False)):
+                images = generate_fgsm_example(model, images, targets)
+
             # Train step
             optimizer.zero_grad()
             outputs = model(images, targets)
@@ -272,9 +294,9 @@ class Trainer:
             losses.append(loss)
 
             # To CPU before decoding to avoid CUDA OOM
-            try:
+            if isinstance(outputs, torch.Tensor):
                 outputs = outputs.cpu()
-            except AttributeError:
+            elif isinstance(outputs, (tuple, list)):
                 outputs = [out.cpu() for out in outputs]
             images = images.cpu()
             targets = targets.cpu()
