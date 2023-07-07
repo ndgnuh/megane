@@ -88,3 +88,18 @@ class LogCoshDiceLoss(nn.Module):
     def forward(self, pr, gt):
         dice = self.dice(pr, gt)
         return torch.log(torch.cosh(dice))
+
+
+def dice_loss(pr, gt, reduction="mean"):
+    pr = torch.sigmoid(pr)
+    losses = 1 - (pr * gt * 2 + 1) / (pr + gt + 1)
+    if reduction == "mean":
+        return losses.mean()
+    elif reduction == "none":
+        return losses
+    else:
+        raise NotImplementedError(f"Unknown reduction {reduction}")
+
+
+def lc_dice_loss(pr, gt, reduction="mean"):
+    torch.log(torch.cosh(dice_loss(pr, gt, reduction)))

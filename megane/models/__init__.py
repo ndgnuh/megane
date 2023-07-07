@@ -28,6 +28,7 @@ class necks:
 
 class heads:
     from megane.models.head_dbnet import DBNet as dbnet
+    from megane.models.head_dbgnet import DBNet as dbgnet
 
 
 class Model(nn.Module):
