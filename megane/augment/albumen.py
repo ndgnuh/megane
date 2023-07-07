@@ -70,11 +70,11 @@ def decode(outputs):
     xy = outputs["keypoints"]
 
     # Conver keypoints to bounding boxes
-    groups = toolz.groupby(lambda i: i, masks)
+    groups = toolz.groupby(lambda i: i[1], enumerate(masks))
     out_classes = []
     boxes = []
     for i, idx in groups.items():
-        box = simpoly.scale_from([xy[i] for i in idx], w, h)
+        box = simpoly.scale_from([xy[j] for j, _ in idx], w, h)
         if len(box) > 2:
             boxes.append(box)
             out_classes.append(classes[i])
