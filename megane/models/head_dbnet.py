@@ -14,22 +14,8 @@ from megane.models.api import ModelAPI
 from megane.debug import with_timer
 
 
-def shrink_dist(w, h, r):
-    A = w * h
-    L = (w + h) * 2
-    d = A / L * (1 - r**2)
-    return d
-
-
-def expand_dist(w, h, r):
-    A = w * h
-    L = (w + h) * 2
-    d = A * r / L
-    return d
-
-
 # @with_timer
-def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4):
+def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4, shrink: bool = True):
     boxes = sample.boxes
     W, H = sample.image.size
     classes = sample.classes
@@ -47,7 +33,10 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4):
     for xy, cls in zip(boxes, classes):
         box = xy
         d = simpoly.get_shrink_dist(box, r)
-        sbox = np.array(simpoly.offset(box, d), dtype=int)
+        if shrink:
+            sbox = np.array(simpoly.offset(box, d), dtype=int)
+        else:
+            sbox = np.array(box, dtype=int)
         ebox = np.array(simpoly.offset(box, -d), dtype=int)
 
         # Draw probability map
@@ -76,7 +65,7 @@ def _compute_score(proba_map, rect):
     return score
 
 
-def decode_dbnet(proba_maps, expand_rate: float = 1.5):
+def decode_dbnet(proba_maps, expand_rate: float = 1.5, shrink: bool = True):
     C, H, W = proba_maps.shape
 
     classes = []
@@ -94,7 +83,8 @@ def decode_dbnet(proba_maps, expand_rate: float = 1.5):
 
             # cnt = cv2.approxPolyDP(cnt, L * 0.01, True)
             box = cnt[:, 0, :].tolist()
-            box = simpoly.offset(box, D)
+            if shrink:
+                box = simpoly.offset(box, D)
             box = simpoly.scale_from(box, W, H)
             score = 0.5
 
@@ -193,6 +183,7 @@ class DBNet(ModelAPI):
         num_classes: int,
         shrink_rate: float = 0.4,
         expand_rate: float = 1.5,
+        shrink: bool = True,
         resize_mode: str = "resize",
     ):
         super().__init__()
@@ -301,7 +292,7 @@ class DBNet(ModelAPI):
         shrink_rate = self.shrink_rate
         sample = bind(sample).image.set(sample.image.resize([sz, sz]))
         image = utils.prepare_input(sample.image, sz, sz, self.resize_mode)
-        targets = encode_dbnet(sample, num_classes, shrink_rate)
+        targets = encode_dbnet(sample, num_classes, shrink_rate, shrink=self.shrink)
         return image, targets
 
     def post_process(self, probas):
@@ -335,6 +326,7 @@ class DBNet(ModelAPI):
         boxes, classes, scores = decode_dbnet(
             outputs.numpy(),
             self.expand_rate,
+            self.shrink,
         )
         sample = Sample(
             image=image,
