@@ -10,3 +10,5 @@ pydantic
 albumentations
 onnx
 lenses
+git+https://github.com/ndgnuh/lmds
+simpoly
