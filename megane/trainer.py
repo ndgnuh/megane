@@ -271,6 +271,14 @@ class Trainer:
             loss = model.compute_loss(outputs, targets).item()
             losses.append(loss)
 
+            # To CPU before decoding to avoid CUDA OOM
+            try:
+                outputs = outputs.cpu()
+            except AttributeError:
+                outputs = [out.cpu() for out in outputs]
+            images = images.cpu()
+            targets = targets.cpu()
+
             # Inference output
             for i in range(images.shape[0]):
                 _inputs = batch_get_index(images, i)
