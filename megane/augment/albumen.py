@@ -139,15 +139,13 @@ def default_transform(prob, background_images, domain_images):
         A.OneOf(
             [
                 A.Affine(
-                    scale=(0.4, 1),
-                    rotate=(-30, 30),
-                    translate_percent=0.0,
-                    shear=0,
+                    scale=(0.3, 1),
+                    rotate=(-180, 180),
+                    translate_percent=0.2,
+                    shear=0.2,
                     keep_ratio=True,
                     fit_output=True,
                 ),
-                A.RandomRotate90(),
-                A.Transpose(),
             ],
             p=prob,
         ),
