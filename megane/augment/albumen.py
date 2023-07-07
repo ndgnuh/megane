@@ -74,7 +74,7 @@ def decode(outputs):
     out_classes = []
     boxes = []
     for i, idx in groups.items():
-        box = [xy[i] for i in idx]
+        box = simpoly.scale_from([xy[i] for i in idx], w, h)
         if len(box) > 2:
             boxes.append(box)
             out_classes.append(classes[i])
@@ -153,9 +153,9 @@ def default_transform(prob, background_images, domain_images):
     if len(domain_images) > 0:
         domain_transforms = A.OneOf(
             [
-                # A.FDA(domain_images, beta_limit=0.025),
-                A.HistogramMatching(domain_images, p=0.2),
-                A.PixelDistributionAdaptation(domain_images, p=0.4),
+                A.FDA(domain_images, beta_limit=0.025),
+                A.HistogramMatching(domain_images),
+                A.PixelDistributionAdaptation(domain_images),
             ],
             p=prob,
         )
