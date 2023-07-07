@@ -7,6 +7,7 @@ import torch
 from lightning import Fabric
 from tensorboardX import SummaryWriter
 from torch import optim
+from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -79,7 +80,6 @@ class Trainer:
 
         # Model & optimization
         self.model: ModelAPI = Model(model_config)
-        print(self.model)
         if model_config.continue_weight:
             load_weights(
                 self.model,
@@ -87,6 +87,11 @@ class Trainer:
             )
         # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
+        self.lr_scheduler = lr_scheduler.OneCycleLR(
+            self.optimizer,
+            max_lr=train_config.lr,
+            total_steps=train_config.total_steps,
+        )
 
         # Dataloader
         augment = train_config.augment
@@ -141,6 +146,7 @@ class Trainer:
 
     def train(self):
         model, optimizer = self.fabric.setup(self.model, self.optimizer)
+        lr_scheduler = self.lr_scheduler
         dataloader = self.fabric.setup_dataloaders(self.train_loader)
         fabric = self.fabric
 
@@ -161,9 +167,12 @@ class Trainer:
             fabric.backward(loss)
             # fabric.clip_gradients(model, optimizer, max_norm=5)
             optimizer.step()
+            lr_scheduler.step()
             loss = loss.item()
 
             # Logging
+            lr = lr_scheduler.get_last_lr()[0]
+            logger.add_scalar("train/lr", lr, step)
             logger.add_scalar("train/loss", loss, step)
             pbar.set_postfix({"loss": loss})
 
