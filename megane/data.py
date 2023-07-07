@@ -32,7 +32,7 @@ class Sample:
 
     image: Image
     boxes: pvector = field(default_factory=pvector)
-    classes: pvector[int] = field(default_factory=pvector)
+    classes: pvector = field(default_factory=pvector)
     scores: Optional[pvector] = None
 
     def __post_init__(self):
