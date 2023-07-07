@@ -99,19 +99,22 @@ def default_transform(prob, background_images, domain_images):
         A.OneOf(
             [
                 A.RandomBrightnessContrast(),
-                A.InvertImg(),
                 A.ToGray(),
                 A.Equalize(),
                 A.ChannelDropout(),
                 A.ChannelShuffle(),
                 A.FancyPCA(),
-                A.Solarize(),
                 A.ToSepia(),
                 A.ColorJitter(),
                 A.RandomGamma(),
+                A.RGBShift(),
+            ],
+            p=prob,
+        ),
+        A.OneOf(
+            [
                 A.RandomShadow(),
                 A.RandomSunFlare(),
-                A.RGBShift(),
             ],
             p=prob,
         ),
@@ -145,6 +148,7 @@ def default_transform(prob, background_images, domain_images):
                     shear=0.2,
                     keep_ratio=True,
                     fit_output=True,
+                    cval=(125, 125, 125),
                 ),
             ],
             p=prob,

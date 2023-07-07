@@ -12,9 +12,11 @@ from megane.utils import denormalize_polygon, draw_mask
 
 def replace_background(image, background, polygons):
     w, h = image.size
+    blend = random.uniform(0.5, 1)
     polygons = denormalize_polygon(polygons, w, h, batch=True)
     polygons = [np.array(p) for p in polygons]
     mask = draw_mask(w, h, polygons).astype(bool)[:, :, None]
+    mask = mask * blend
     image = np.array(image)
     background = np.array(background.resize((w, h)).convert("RGB"))
     image = image * mask + (~mask) * background
