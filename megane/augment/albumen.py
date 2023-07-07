@@ -1,6 +1,8 @@
 import albumentations as A
 import cv2
 import numpy as np
+import simpoly
+import toolz
 from PIL import Image
 
 from megane import utils
@@ -29,23 +31,25 @@ def encode(sample: Sample):
         transform(**enc)
     """
     image = np.array(sample.image)
-    w, h = sample.image.size
-    boxes = utils.denormalize_polygon(sample.boxes, w, h, batch=True)
+    classes = sample.classes
+    boxes = sample.boxes
+    h, w = image.shape[:2]
     masks = []
     keypoints = []
     for i, polygon in enumerate(boxes):
+        polygon = simpoly.scale_to(polygon, w, h)
         keypoints.extend(polygon)
         masks.extend([i] * len(polygon))
-    return dict(image=image, keypoints=keypoints, box_mapping=masks)
+
+    assert max(masks) == len(classes) - 1
+    return dict(image=image, keypoints=keypoints, box_mapping=masks, classes=classes)
 
 
-def decode(sample: Sample, outputs):
+def decode(outputs):
     """
     Decodes the albumenation outputs into a Sample object.
 
     Args:
-        sample (Sample):
-            The original Sample object.
         outputs (dict):
             The outputs obtained from the encoding process.
 
@@ -59,31 +63,30 @@ def decode(sample: Sample, outputs):
             "box_mapping": box_mapping, "keypoints": keypoints}
         decoded_sample = decode(sample, outputs)
     """
-    w, h = sample.image.size
     image = Image.fromarray(outputs["image"])
+    w, h = image.size
+    classes = outputs["classes"]
+    masks = outputs["box_mapping"]
+    xy = outputs["keypoints"]
 
-    # Convert keypoints to bounding boxes
-    boxes = [[]] * len(sample.boxes)
-    for mask, xy in zip(outputs["box_mapping"], outputs["keypoints"]):
-        x, y = xy
-        boxes[mask].append((x, y))
+    # Conver keypoints to bounding boxes
+    groups = toolz.groupby(lambda i: i, masks)
+    out_classes = []
+    boxes = []
+    for i, idx in groups.items():
+        box = [xy[i] for i in idx]
+        if len(box) > 2:
+            boxes.append(box)
+            out_classes.append(classes[i])
 
-    # Remove invalid bounding boxes
-    keeps = [len(box) > 2 for box in boxes]
-    boxes = utils.normalize_polygon(boxes, w, h, batch=True)
-    boxes = [c for (c, keep) in zip(boxes, keeps) if keep]
-    classes = [c for (c, keep) in zip(sample.classes, keeps) if keep]
-    if sample.scores is None:
-        scores = None
-    else:
-        scores = [c for (c, keep) in zip(sample.scores, keeps) if keep]
+    # Correctness checking
+    assert len(boxes) == len(out_classes)
 
     # Reconstruct another sample
     return Sample(
         image=image,
         boxes=boxes,
-        classes=classes,
-        scores=scores,
+        classes=out_classes,
     )
 
 
@@ -99,13 +102,13 @@ def default_transform(prob, background_images, domain_images):
                 A.ChannelDropout(),
                 A.ChannelShuffle(),
                 A.FancyPCA(),
-                # A.Solarize(),
-                # A.ToSepia(),
-                # A.ColorJitter(),
-                # A.RandomGamma(),
-                # A.RandomShadow(),
-                # A.RandomSunFlare(),
-                # A.RGBShift(),
+                A.Solarize(),
+                A.ToSepia(),
+                A.ColorJitter(),
+                A.RandomGamma(),
+                A.RandomShadow(),
+                A.RandomSunFlare(),
+                A.RGBShift(),
             ],
             p=prob,
         ),
@@ -130,21 +133,21 @@ def default_transform(prob, background_images, domain_images):
         #     ],
         #     p=prob,
         # )
-        # A.OneOf(
-        #     [
-        #         A.Affine(
-        #             scale=(0.4, 1),
-        #             rotate=(-30, 30),
-        #             translate_percent=0.0,
-        #             shear=0,
-        #             keep_ratio=True,
-        #             fit_output=True,
-        #         ),
-        #         # A.RandomRotate90(),
-        #         # A.Transpose(),
-        #     ],
-        #     p=prob,
-        # ),
+        A.OneOf(
+            [
+                A.Affine(
+                    scale=(0.4, 1),
+                    rotate=(-30, 30),
+                    translate_percent=0.0,
+                    shear=0,
+                    keep_ratio=True,
+                    fit_output=True,
+                ),
+                A.RandomRotate90(),
+                A.Transpose(),
+            ],
+            p=prob,
+        ),
     ]
 
     if len(domain_images) > 0:
@@ -159,5 +162,5 @@ def default_transform(prob, background_images, domain_images):
         transformations.append(domain_transforms)
     return A.Compose(
         transformations,
-        # keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
+        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
     )

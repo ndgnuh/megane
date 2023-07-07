@@ -35,9 +35,16 @@ class Augmentation:
         else:
             self.custom_transform = lambda x: x
 
+    def _albumen_transform(self, sample):
+        enc = A.encode(sample)
+        enc = self.albumen_transform(**enc)
+        return A.decode(enc)
+
     def __call__(self, sample: Sample) -> Sample:
-        sample = self.custom_transform(sample)
-        image = np.array(sample.image)
-        augmented = self.albumen_transform(image=image)
-        sample.image = Image.fromarray(augmented["image"])
+        if random.choice((True, False)):
+            sample = self.custom_transform(sample)
+            sample = self._albumen_transform(sample)
+        else:
+            sample = self._albumen_transform(sample)
+            sample = self.custom_transform(sample)
         return sample
