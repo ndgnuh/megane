@@ -119,8 +119,10 @@ def default_transform(prob, background_images, domain_images):
                 A.RandomShadow(shadow_roi=(0, 0, 1, 1)),
                 A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
                 A.Compose(
-                    A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
-                    BloomFilter(),
+                    [
+                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
+                        BloomFilter(),
+                    ]
                 ),
             ],
             p=prob,

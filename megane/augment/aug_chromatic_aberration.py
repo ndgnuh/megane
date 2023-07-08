@@ -7,7 +7,7 @@ import albumentations as A
 
 
 def ChromaticAberration(px=(-10, 10), **kwargs):
-    fn = partial(chromatic_aberration, px)
+    fn = partial(chromatic_aberration, px=px)
     return A.Lambda(image=fn, name="ChromaticAberration", **kwargs)
 
 
