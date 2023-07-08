@@ -159,15 +159,23 @@ def default_transform(prob, background_images, domain_images):
         # )
         A.OneOf(
             [
-                A.Perspective(fit_output=True, pad_val=255 // 2),
+                A.Perspective(fit_output=True, pad_val=(127, 127, 127)),
+                A.Perspective(fit_output=True, pad_mode=cv2.BORDER_REPLICATE),
                 A.Affine(
                     scale=(0.3, 1),
                     rotate=(-180, 180),
                     translate_percent=(0, 0.25),
                     shear=(-45, 45),
-                    keep_ratio=True,
                     fit_output=True,
-                    cval=255 // 2,
+                    mode=cv2.BORDER_REPLICATE,
+                ),
+                A.Affine(
+                    scale=(0.3, 1),
+                    rotate=(-180, 180),
+                    translate_percent=(0, 0.25),
+                    shear=(-45, 45),
+                    fit_output=True,
+                    cval=(127, 127, 127),
                 ),
             ],
             p=prob,
