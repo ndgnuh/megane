@@ -1,4 +1,6 @@
+import torch
 from torch import Tensor, nn
+from torchvision import transforms as T
 
 from megane.models.api import ModelAPI
 from megane.utils import init_from_ns
@@ -37,6 +39,10 @@ class Model(nn.Module):
         self.image_size = config.image_size
 
         # Backbone
+        self.preprocess = T.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+        )
         self.backbone = init_from_ns(backbones, config.backbone)
         self.neck = init_from_ns(necks, config.neck)
         try:
@@ -59,6 +65,7 @@ class Model(nn.Module):
         self.set_infer(False)
 
     def forward(self, images: Tensor, targets: Tensor | None = None):
+        images = self.preprocess(images)
         features = self.backbone(images)
         features = self.neck(features)
         outputs = self.head(features, targets)
