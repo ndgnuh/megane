@@ -41,6 +41,7 @@ class Augmentation:
         return A.decode(enc)
 
     def __call__(self, sample: Sample) -> Sample:
+        random.shuffle(self.albumen_transform.transforms)
         if random.choice((True, False)):
             sample = self.custom_transform(sample)
             sample = self._albumen_transform(sample)
