@@ -9,6 +9,9 @@ from megane import utils
 from megane.data import Sample
 
 
+from megane.augment.aug_bloom import BloomFilter
+
+
 def idendity(**kw):
     return kw
 
@@ -116,19 +119,7 @@ def default_transform(prob, background_images, domain_images):
             [
                 A.RandomShadow(shadow_roi=(0, 0, 1, 1)),
                 A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
-                A.RandomToneCurve(),
-                A.Compose(
-                    [
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), src_radius=30),
-                    ]
-                ),
+                BloomFilter(),
             ],
             p=prob,
         ),
