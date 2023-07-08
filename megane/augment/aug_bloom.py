@@ -7,9 +7,19 @@ import numpy as np
 import albumentations as A
 
 
-def BloomFilter(white_threshold=(220, 240), blur: int = (2, 20), gain: int = (0.3, 3)):
-    fn = partial(bloom_filter, white_threshold=white_threshold, blur=blur, gain=gain)
-    return A.Lambda(image=fn, name="BloomFilter")
+def BloomFilter(
+    white_threshold=(220, 240),
+    blur: int = (2, 20),
+    gain: int = (0.3, 3),
+    **kwargs,
+):
+    fn = partial(
+        bloom_filter,
+        white_threshold=white_threshold,
+        blur=blur,
+        gain=gain,
+    )
+    return A.Lambda(image=fn, name="BloomFilter", **kwargs)
 
 
 def bloom_filter(

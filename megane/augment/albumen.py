@@ -5,11 +5,10 @@ import simpoly
 import toolz
 from PIL import Image
 
-from megane import utils
 from megane.data import Sample
 
-
 from megane.augment.aug_bloom import BloomFilter
+from megane.augment.aug_chromatic_aberration import ChromaticAberration
 
 
 def idendity(**kw):
@@ -119,10 +118,15 @@ def default_transform(prob, background_images, domain_images):
             [
                 A.RandomShadow(shadow_roi=(0, 0, 1, 1)),
                 A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
-                BloomFilter(),
+                A.Compose(
+                    A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
+                    BloomFilter(),
+                ),
             ],
             p=prob,
         ),
+        BloomFilter(p=prob),
+        ChromaticAberration(p=prob),
         # Degrade
         A.OneOf(
             [
