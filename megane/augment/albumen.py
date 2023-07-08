@@ -146,6 +146,14 @@ def default_transform(prob, background_images, domain_images):
             ],
             p=prob,
         ),
+        # Safe (?) geometric transform
+        A.RandomRotate90(p=prob),
+        A.VerticalFlip(p=prob),
+        A.HorizontalFlip(p=prob),
+        A.SafeRotate(limit=180, p=prob),
+        # Misc
+        A.Cutout(p=prob),
+        # Disabled
         # Geometric transform/rotate
         # A.OneOf(
         #     [
@@ -156,10 +164,6 @@ def default_transform(prob, background_images, domain_images):
         # )
         A.OneOf(
             [
-                A.Perspective(fit_output=True, scale=0.4, pad_val=(127, 127, 127)),
-                A.Perspective(
-                    fit_output=True, scale=0.4, pad_mode=cv2.BORDER_REPLICATE
-                ),
                 A.Affine(
                     scale=(0.3, 1),
                     rotate=(-180, 180),
@@ -177,7 +181,7 @@ def default_transform(prob, background_images, domain_images):
                     cval=(127, 127, 127),
                 ),
             ],
-            p=prob,
+            p=0,  # Disable until we figure out what was went wrong
         ),
     ]
 
