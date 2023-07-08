@@ -3,7 +3,8 @@ from functools import partial
 from typing import Union, Tuple
 
 import cv2
-import albumentation as A
+import numpy as np
+import albumentations as A
 
 
 def BloomFilter(white_threshold=(220, 240), blur: int = (2, 20), gain: int = (0.3, 3)):
