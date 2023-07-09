@@ -1,3 +1,5 @@
+from itertools import product
+
 import albumentations as A
 import cv2
 import numpy as np
@@ -9,6 +11,13 @@ from megane.data import Sample
 
 from megane.augment.aug_bloom import BloomFilter
 from megane.augment.aug_chromatic_aberration import ChromaticAberration
+
+
+def rgb_range(step=10):
+    r = range(0, 255, step)
+    g = range(0, 255, step)
+    b = range(0, 255, step)
+    return product(r, g, b)
 
 
 def idendity(**kw):
@@ -110,18 +119,34 @@ def default_transform(prob, background_images, domain_images):
                 A.ColorJitter(),
                 A.RandomGamma(),
                 A.RGBShift(),
-                A.RandomBrightness(),
             ],
             p=prob,
         ),
-        A.RandomShadow(shadow_roi=(0, 0, 1, 1), p=prob),
-        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), p=prob),
-        BloomFilter(p=prob),
-        ChromaticAberration(p=prob),
+        # Lighting
+        A.OneOf(
+            [
+                A.RandomShadow(shadow_roi=(0, 0, 1, 1)),
+                A.RandomSunFlare(
+                    flare_roi=(0, 0, 1, 1),
+                    p=prob,
+                    src_radius=32,
+                    num_flare_circles_upper=20,
+                ),
+                BloomFilter(),
+                ChromaticAberration(),
+            ],
+            p=prob,
+        ),
         # Degrade
         A.OneOf(
             [
                 A.PixelDropout(),
+                A.OneOf(
+                    [
+                        A.CoarseDropout(fill_value=color, max_width=32, max_height=32)
+                        for color in range(0, 255, 10)
+                    ]
+                ),
                 A.Downscale(interpolation=cv2.INTER_LINEAR),
                 A.Blur(),
                 A.MedianBlur(),
@@ -134,42 +159,36 @@ def default_transform(prob, background_images, domain_images):
             ],
             p=prob,
         ),
-        # Safe (?) geometric transform
-        # A.RandomRotate90(p=prob),
-        A.VerticalFlip(p=prob),
-        A.HorizontalFlip(p=prob),
-        # Misc
-        A.Cutout(p=prob),
-        # Disabled
-        # Geometric transform/rotate
-        # A.OneOf(
-        #     [
-        #         A.Perspective(fit_output=True),
-        #         A.SafeRotate((-180, 180), border_mode=cv2.BORDER_CONSTANT),
-        #     ],
-        #     p=prob,
-        # )
-        # A.OneOf(
-        #     [
-        #         A.Affine(
-        #             scale=(0.3, 1),
-        #             rotate=(-180, 180),
-        #             translate_percent=(0, 0),
-        #             shear=(0, 0),
-        #             fit_output=True,
-        #             mode=cv2.BORDER_REPLICATE,
-        #         ),
-        #         A.Affine(
-        #             scale=(0.3, 1),
-        #             rotate=(-180, 180),
-        #             translate_percent=(0, 0),
-        #             shear=(0, 0),
-        #             fit_output=True,
-        #             cval=(127, 127, 127),
-        #         ),
-        #     ],
-        #     p=0,  # Disable until we figure out what was went wrong
-        # ),
+        # group: Flipping around
+        A.OneOf(
+            [
+                A.RandomRotate90(p=prob),
+                A.VerticalFlip(p=prob),
+                A.HorizontalFlip(p=prob),
+            ],
+            p=prob,
+        ),
+        # group: Geometric transform
+        A.OneOf(
+            [
+                *[
+                    A.Perspective(fit_output=True, pad_val=(r, g, b))
+                    for (r, g, b) in rgb_range(10)
+                ],
+                *[
+                    A.Affine(
+                        scale=(0.3, 1),
+                        rotate=(-180, 180),
+                        translate_percent=(0.2, 0.2),
+                        shear=(-30, 30),
+                        fit_output=True,
+                        cval=(r, g, b),
+                    )
+                    for (r, g, b) in rgb_range(10)
+                ],
+            ],
+            p=prob,
+        ),
     ]
 
     if len(domain_images) > 0:
