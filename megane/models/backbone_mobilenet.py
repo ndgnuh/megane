@@ -1,231 +1,95 @@
-from typing import List
-
-import torch
 from torch import nn
-
-from megane.models.utils import AFAttention, Chain
-
-
-class AFTransformerLayer(nn.Module):
-    def __init__(
-        self,
-        hidden_size: int,
-        ctx_length: int,
-        dropout: float = 0.0,
-        act: callable = nn.ReLU,
-    ):
-        super().__init__()
-        self.attention = AFAttention(hidden_size, ctx_length)
-        self.norm_attention = nn.LayerNorm(hidden_size)
-        self.mlp = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size * 4),
-            act(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_size * 4, hidden_size),
-            nn.Dropout(dropout),
-        )
-        self.norm_mlp = nn.LayerNorm(hidden_size)
-
-    def forward(self, x):
-        # Forward attention
-        residual = x
-        x = self.norm_attention(x)
-        x = self.attention(x)
-        x = x + residual
-
-        # Forward mlp
-        residual = x
-        x = self.norm_mlp(x)
-        x = self.mlp(x)
-        x = x + residual
-
-        return x
 
 
 class MV2Block(nn.Module):
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        stride=1,
-        expand=6,
-    ):
+    def __init__(self, in_channels, out_channels, expand, stride):
         super().__init__()
         mid_channels = in_channels * expand
-        self.features = Chain(
-            pconv1=nn.Conv2d(in_channels, mid_channels, 1, bias=False),
-            pn1=nn.BatchNorm2d(mid_channels),
-            pa1=nn.ReLU6(),
-            dconv=nn.Conv2d(
+        self.skip = stride == 1 and in_channels == out_channels
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, mid_channels, 1, bias=False),
+            nn.InstanceNorm2d(mid_channels),
+            nn.ReLU6(inplace=True),
+            nn.Conv2d(
                 mid_channels,
                 mid_channels,
                 kernel_size=3,
-                stride=stride,
-                groups=mid_channels,
-                bias=False,
                 padding=1,
+                groups=mid_channels,
+                stride=stride,
+                bias=False,
             ),
-            dn=nn.BatchNorm2d(mid_channels),
-            da=nn.ReLU6(),
-            pconv2=nn.Conv2d(mid_channels, out_channels, 1, bias=False),
-            pn2=nn.BatchNorm2d(out_channels),
+            nn.InstanceNorm2d(mid_channels),
+            nn.ReLU6(inplace=True),
+            nn.Conv2d(mid_channels, out_channels, 1, bias=False),
+            nn.InstanceNorm2d(mid_channels),
         )
-        self.use_residual = (in_channels == out_channels) and stride == 1
 
-    def forward(self, imgs):
-        outputs = self.features(imgs)
-        if self.use_residual:
-            outputs = imgs + outputs
-        return outputs
+    def forward(self, img):
+        if self.skip:
+            return img + self.conv(img)
+        else:
+            return self.conv(img)
 
 
-class MViTBlock(nn.Module):
-    def __init__(self, hidden_size, output_size, num_layers, ft_map_size, stride=1):
+class MobileNetV2(nn.Module):
+    def default_config(self):
+        # c, t, s, n
+        return [
+            [16, 24, 32, 64, 96, 160, 320],
+            [1, 6, 6, 6, 6, 6, 6],
+            [1, 2, 2, 2, 1, 2, 1],
+            [1, 2, 3, 4, 3, 3, 1],
+        ]
+
+    def __init__(self, config=None, stem_size: int = 32, output_size: int = 1280):
         super().__init__()
-        # Local representation block
-        self.local_representation = nn.Sequential(
-            nn.Conv2d(hidden_size, hidden_size, 3, padding=1),
-            nn.Conv2d(hidden_size, hidden_size, 1),
+        if config is None:
+            config = self.default_config()
+
+        # Stem layer
+        stem = nn.Sequential(
+            nn.Conv2d(3, stem_size, 3, padding=1, stride=2, bias=False),
+            nn.BatchNorm2d(stem_size),
+            nn.ReLU6(True),
         )
 
-        # Transformer block
-        layers = []
-        ctx_length = ft_map_size**2
-        for i in range(num_layers):
-            layer = AFTransformerLayer(hidden_size, ctx_length)
+        # MV2 blocks
+        pc = stem_size
+        layers = [stem]
+        for c, t, s, n in zip(*config):
+            layer = MV2Block(pc, c, expand=t, stride=s)
             layers.append(layer)
-        self.layers = nn.Sequential(*layers)
+            for i in range(1, n):
+                layer = MV2Block(c, c, expand=t, stride=1)
+                layers.append(layer)
+            pc = c
 
-        # Fusion block
-        self.fusion_conv1 = nn.Conv2d(hidden_size, hidden_size, 1)
-        self.fusion_conv2 = nn.Conv2d(
-            hidden_size * 2,
-            output_size,
-            kernel_size=3,
-            padding=1,
-            stride=stride,
+        # Final conv
+        out_conv = nn.Sequential(
+            nn.Conv2d(pc, output_size, 1, bias=False),
+            nn.InstanceNorm2d(output_size),
+            nn.ReLU6(True),
         )
+        layers.append(out_conv)
 
-    def unfold(self, x):
-        n, c, h, w = x.shape
-        x = x.reshape(n, c, -1)
-        x = x.transpose(1, -1)
-        return x, h, w
+        # Features
+        self.features = nn.ModuleList(layers)
 
-    def fold(self, x, h, w):
-        n, l, c = x.shape
-        assert h * w == l
-        x = x.transpose(-1, 1)
-        x = x.reshape(n, c, h, w)
-        return x
+        # Output keeping masks
+        self.keep = [False] * len(self.features)
+        for i in (3, 6, 13, 18):
+            self.keep[i] = True
 
-    def forward(self, x):
-        # x: N C H W
-        residual = x
-        # Unfold
-
-        # local repr
-        x = self.local_representation(x)
-
-        # transformer
-        x, h, w = self.unfold(x)
-        x = self.layers(x)
-        x = self.fold(x, h, w)
-
-        # fusion
-        x = self.fusion_conv1(x)
-        x = torch.cat([x, residual], dim=1)
-        x = self.fusion_conv2(x)
-        return x
-
-
-# class MobileViT(nn.Module):
-#     def __init__(
-#         self,
-#         image_size: int,
-#         hidden_sizes: List[int],
-#     ):
-#         super().__init__()
-#         self.stem = nn.Conv2d(
-#             in_channels=3,
-#             out_channels=16,
-#             kernel_size=3,
-#             stride=2,
-#             padding=1,
-#         )
-
-#         # Short word
-#         c = hidden_sizes
-#         B1 = MV2Block
-#         B2 = MViTBlock
-
-
-#         configs = [
-#             # stage 1
-#             (B1, 16, c[0], 1),
-#             # stage 2
-#             (B1, c[0], c[1], 2),
-#             (B1, c[1], c[1], 1),
-#             (B1, c[1], c[1], 1),
-#             # stage 3
-#             (B1, c[1], c[2], 2),
-#             (B2, c[1],
-#         ]
-
-
-class AFViT(nn.Module):
-    def __init__(
-        self,
-        image_size: int,
-        hidden_sizes: List[int],
-        num_layers: List[int],
-        project_size: int,
-    ):
-        super().__init__()
-        self.patch_embedding = nn.Sequential(
-            nn.Conv2d(3, hidden_sizes[0], 3, stride=2, padding=1),
-            nn.InstanceNorm2d(hidden_sizes[0]),
-            nn.ReLU(),
-        )
-
-        self.stages = nn.ModuleList()
-        self.projections = nn.ModuleList()
-
-        num_stages = len(hidden_sizes) - 1
-        ft_map_size = image_size // 2
-
-        for i in range(num_stages):
-            stage = MViTBlock(
-                hidden_size=hidden_sizes[i],
-                output_size=hidden_sizes[i + 1],
-                num_layers=num_layers[i],
-                ft_map_size=ft_map_size,
-                stride=2,
-            )
-            ft_map_size = ft_map_size // 2
-            self.stages.append(stage)
-            self.projections.append(
-                nn.Conv2d(
-                    hidden_sizes[i + 1],
-                    project_size,
-                    kernel_size=1,
-                )
-            )
-
-    def forward(self, x):
-        x = self.patch_embedding(x)
+    def forward(self, image):
         outputs = []
-        for i, stage in enumerate(self.stages):
-            project = self.projections[i]
-            x = stage(x)
-            outputs.append(project(x))
+        for keep, layer in zip(self.keep, self.features):
+            image = layer(image)
+            keep and outputs.append(image)
+
+        # Output sizes, with input = 224 * 224
+        # torch.Size([1, 24, 56, 56])
+        # torch.Size([1, 32, 28, 28])
+        # torch.Size([1, 96, 14, 14])
+        # torch.Size([1, 1280, 7, 7])
         return outputs
-
-
-def afvit_t(image_size: int, project_size: int):
-    return AFViT(
-        image_size=image_size,
-        num_layers=[3, 3, 3, 3],
-        hidden_sizes=[32, 64, 96, 128, 192],
-        project_size=project_size,
-    )
