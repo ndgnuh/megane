@@ -114,19 +114,8 @@ def default_transform(prob, background_images, domain_images):
             ],
             p=prob,
         ),
-        A.OneOf(
-            [
-                A.RandomShadow(shadow_roi=(0, 0, 1, 1)),
-                A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
-                A.Compose(
-                    [
-                        A.RandomSunFlare(flare_roi=(0, 0, 1, 1)),
-                        BloomFilter(),
-                    ]
-                ),
-            ],
-            p=prob,
-        ),
+        A.RandomShadow(shadow_roi=(0, 0, 1, 1), p=prob),
+        A.RandomSunFlare(flare_roi=(0, 0, 1, 1), p=prob),
         BloomFilter(p=prob),
         ChromaticAberration(p=prob),
         # Degrade
@@ -141,16 +130,14 @@ def default_transform(prob, background_images, domain_images):
                 A.ISONoise(),
                 A.MultiplicativeNoise(),
                 A.ImageCompression(quality_lower=50),
-                A.JpegCompression(quality_lower=50),
                 A.GaussNoise(),
             ],
             p=prob,
         ),
         # Safe (?) geometric transform
-        A.RandomRotate90(p=prob),
+        # A.RandomRotate90(p=prob),
         A.VerticalFlip(p=prob),
         A.HorizontalFlip(p=prob),
-        A.SafeRotate(limit=180, p=prob),
         # Misc
         A.Cutout(p=prob),
         # Disabled
@@ -162,27 +149,27 @@ def default_transform(prob, background_images, domain_images):
         #     ],
         #     p=prob,
         # )
-        A.OneOf(
-            [
-                A.Affine(
-                    scale=(0.3, 1),
-                    rotate=(-180, 180),
-                    translate_percent=(0, 0),
-                    shear=(0, 0),
-                    fit_output=True,
-                    mode=cv2.BORDER_REPLICATE,
-                ),
-                A.Affine(
-                    scale=(0.3, 1),
-                    rotate=(-180, 180),
-                    translate_percent=(0, 0),
-                    shear=(0, 0),
-                    fit_output=True,
-                    cval=(127, 127, 127),
-                ),
-            ],
-            p=0,  # Disable until we figure out what was went wrong
-        ),
+        # A.OneOf(
+        #     [
+        #         A.Affine(
+        #             scale=(0.3, 1),
+        #             rotate=(-180, 180),
+        #             translate_percent=(0, 0),
+        #             shear=(0, 0),
+        #             fit_output=True,
+        #             mode=cv2.BORDER_REPLICATE,
+        #         ),
+        #         A.Affine(
+        #             scale=(0.3, 1),
+        #             rotate=(-180, 180),
+        #             translate_percent=(0, 0),
+        #             shear=(0, 0),
+        #             fit_output=True,
+        #             cval=(127, 127, 127),
+        #         ),
+        #     ],
+        #     p=0,  # Disable until we figure out what was went wrong
+        # ),
     ]
 
     if len(domain_images) > 0:
