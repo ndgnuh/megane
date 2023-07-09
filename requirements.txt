@@ -7,7 +7,7 @@ pylint
 pyclean
 gdown
 tensorboardX
-pydantic
+pydantic==1.10
 albumentations
 onnx
 lenses
