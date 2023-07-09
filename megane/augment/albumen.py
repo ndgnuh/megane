@@ -20,6 +20,12 @@ def rgb_range(step=10):
     return product(r, g, b)
 
 
+def CoarseDropout(*a, **kw):
+    orig = A.CoarseDropout(*a, **kw)
+    patched = A.Lambda(name="CoarseDropoutImg", image=orig.apply)
+    return patched
+
+
 def idendity(**kw):
     return kw
 
@@ -143,8 +149,8 @@ def default_transform(prob, background_images, domain_images):
                 A.PixelDropout(),
                 A.OneOf(
                     [
-                        A.CoarseDropout(fill_value=color, max_width=32, max_height=32)
-                        for color in range(0, 255, 10)
+                        CoarseDropout(fill_value=color, max_width=32, max_height=32)
+                        for color in range(0, 255)
                     ]
                 ),
                 A.Downscale(interpolation=cv2.INTER_LINEAR),
