@@ -13,7 +13,7 @@ def ChromaticAberration(px=(-10, 10), **kwargs):
 
 def chromatic_aberration(img, px=(-10, 10), **options):
     cs = cv2.split(img)
-    w, h = img.shape[:2]
+    h, w = img.shape[:2]
     mw, mh = w, h
     channels = []
     for i, chan in enumerate(cs):
