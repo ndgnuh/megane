@@ -91,6 +91,8 @@ def get_processor(
     image_size: int,
     fill_value: Tuple[int, int] = (127, 127, 127),
 ):
+    if isinstance(image_size, int):
+        image_size = (image_size, image_size)
     if kind == "resize":
         return Resize(image_size)
     elif kind == "letterbox":
