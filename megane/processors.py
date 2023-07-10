@@ -19,6 +19,7 @@ With this, some weird problem arise though.
 from dataclasses import dataclass
 from typing import Tuple
 
+import simpoly
 from PIL import Image
 from lenses import bind
 
