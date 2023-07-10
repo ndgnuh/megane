@@ -96,7 +96,7 @@ class Trainer:
 
         # Preprocessor
         preprocess = get_processor(
-            type=model_config.resize_mode,
+            kind=model_config.resize_mode,
             image_size=model_config.image_size,
         )
 
