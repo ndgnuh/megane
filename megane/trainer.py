@@ -16,6 +16,7 @@ from megane.configs import ModelConfig, TrainConfig
 from megane.data import get_dataset
 from megane.models import Model, ModelAPI
 from megane.utils import compute_maf1, TimeoutException, time_limit
+from megane.processors import get_processor
 
 
 def generate_fgsm_example(model, images, targets):
@@ -93,6 +94,12 @@ class Trainer:
         self.best_weight_path = f"{weight_dir}/{model_config.best_weight_name}"
         self.latest_weight_path = f"{weight_dir}/{model_config.latest_weight_name}"
 
+        # Preprocessor
+        preprocess = get_processor(
+            type=model_config["resize_mode"],
+            image_size=model_config["image_size"],
+        )
+
         # Torch fabric
         self.fabric = Fabric(**fabric_config)
 
@@ -124,20 +131,23 @@ class Trainer:
             )
 
         def make_loader(data, augment: bool, **kwargs):
-            if augment:
-
-                def transform(sample):
+            # Transform function
+            def transform(sample):
+                sample = preprocess(sample)
+                if augment:
                     sample = augmentation(sample)
-                    return self.model.encode_sample(sample)
+                enc = self.model.encode_sample(sample)
+                return enc
 
-            else:
-                transform = self.model.encode_sample
+            # Dataset
             data = get_dataset(
                 data,
                 classes=model_config.classes,
                 transform=transform,
                 single_class=model_config.single_class,
             )
+
+            # Datalodaer
             loader = DataLoader(
                 data,
                 **dataloader_config,
