@@ -11,6 +11,7 @@ from megane.data import Sample
 
 from megane.augment.aug_bloom import BloomFilter
 from megane.augment.aug_chromatic_aberration import ChromaticAberration
+from megane.augment.aug_fakelight import FakeLight
 
 
 def rgb_range(step=10):
@@ -112,6 +113,8 @@ def decode(outputs):
 
 def default_transform(prob, background_images, domain_images):
     transformations = [
+        # Shader based
+        A.OneOf([FakeLight()], p=prob),
         # Color effects
         A.OneOf(
             [
