@@ -53,12 +53,18 @@ def fake_light(
     if isinstance(alpha, tuple):
         alpha = random.uniform(*alpha)
 
+    # Convert image to RGB if it's gray
+    if image.ndim == 2:
+        image = np.stack([image, image, image], axis=-1)
+
     # Tiles
-    canvas = np.zeros_like(image)
+    canvas = np.zeros((H, W, 3))
     for x in range(0, W, tile_size):
         for y in range(0, H, tile_size):
             br = shader_fn(x, y, W, H)
-            cv2.rectangle(canvas, (x, y), (x + tile_size, y + tile_size), br, -1)
+            x2 = min(x + tile_size, W)
+            y2 = min(y + tile_size, H)
+            cv2.rectangle(canvas, (x, y), (x2, y2), br, -1)
 
     # alpha composite
     image = (image * (1 - alpha) + canvas * alpha).round().astype(image.dtype)
