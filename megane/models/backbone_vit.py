@@ -137,3 +137,9 @@ def mvit_11(project_size: int | None = None):
     hidden_sizes = [32, 64, 128, 192, 192]
     num_layers = [3, 3, 3, 3]
     return ViTFPNBackbone(hidden_sizes, num_layers, project_size=project_size)
+
+
+def mvit_50(project_size: int | None = None):
+    hidden_sizes = [64, 128, 256, 512, 512]
+    num_layers = [3, 4, 6, 3]
+    return ViTFPNBackbone(hidden_sizes, num_layers, project_size=project_size)
