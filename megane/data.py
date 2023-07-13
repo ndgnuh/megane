@@ -46,7 +46,6 @@ class Sample:
 
     def visualize(self) -> Image:
         colors = [
-            "#282a2e",
             "#a54242",
             "#8c9440",
             "#de935f",
@@ -54,7 +53,6 @@ class Sample:
             "#85678f",
             "#5e8d87",
             "#707880",
-            "#373b41",
             "#cc6666",
             "#b5bd68",
             "#f0c674",
@@ -68,7 +66,7 @@ class Sample:
         draw = ImageDraw.Draw(image)
         for polygon, class_id in zip(self.boxes, self.classes):
             xy = [(int(x * w), int(y * h)) for (x, y) in polygon]
-            draw.polygon(xy, outline=colors[class_id])
+            draw.polygon(xy, outline=colors[class_id], width=10)
         return image
 
     def visualize_tensor(self, *a, **k):
