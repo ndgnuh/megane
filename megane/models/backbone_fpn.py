@@ -5,6 +5,14 @@ from torch import nn
 from torchvision import models
 
 from megane.registry import backbones
+from megane.models.backbone_resnet import (
+    resnet18,
+    resnet34,
+    resnet26,
+    resnet50,
+    tinyresnet26,
+    tinyresnet50,
+)
 
 
 class HiddenLayerGetter(nn.Module):
@@ -98,4 +106,46 @@ def fpn_mobilenet_v3_large(out_channels: int):
 def fpn_mobilenet_v3_small(out_channels):
     net = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights).features
     model = FeaturePyramidNetwork(net, [1, 3, 8, 12], out_channels)
+    return model
+
+
+@backbones.register()
+def fpn_resnet18(out_channels):
+    net = resnet18()
+    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    return model
+
+
+@backbones.register()
+def fpn_resnet26(out_channels):
+    net = resnet26()
+    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    return model
+
+
+@backbones.register()
+def fpn_resnet34(out_channels):
+    net = resnet34()
+    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    return model
+
+
+@backbones.register()
+def fpn_resnet50(out_channels):
+    net = resnet50()
+    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    return model
+
+
+@backbones.register()
+def fpn_tinyresnet26(out_channels):
+    net = tinyresnet26()
+    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    return model
+
+
+@backbones.register()
+def fpn_tinyresnet50(out_channels):
+    net = tinyresnet50()
+    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
     return model

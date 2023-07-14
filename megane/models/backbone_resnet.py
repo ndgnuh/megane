@@ -8,7 +8,7 @@ def ConvNorm(*a, **k):
     # There is no point adding bias
     # we are just going to normalize right after that
     conv = nn.Conv2d(*a, **k, bias=False)
-    norm = nn.InstanceNorm2d(conv.out_channels)
+    norm = nn.BatchNorm2d(conv.out_channels)
     relu = nn.ReLU()
     return nn.Sequential(conv, norm, relu)
 
@@ -73,23 +73,21 @@ def ResNetStage(
     return nn.Sequential(*layers)
 
 
-class ResNet(nn.Module):
+class ResNet(nn.Sequential):
     def __init__(
         self,
         hidden_sizes: List[int],
         num_layers: List[int],
         block_type: ResidualBlock | BottleNeckBlock,
-        project_size: int = None,
     ):
         super().__init__()
         self.input = nn.Sequential(
             nn.Conv2d(3, hidden_sizes[0], 7, padding=3, stride=2),
-            nn.InstanceNorm2d(hidden_sizes[0]),
+            nn.BatchNorm2d(hidden_sizes[0]),
             nn.ReLU(),
             nn.MaxPool2d(2),
         )
-        self.stages = nn.ModuleList()
-        self.projections = nn.ModuleList()
+        self.stages = []
 
         strides = [1, 2, 2, 2]
         for i, input_size in enumerate(hidden_sizes):
@@ -101,6 +99,7 @@ class ResNet(nn.Module):
 
             # Stage layer
             num_layer = num_layers[i]
+            layer_name = f"stage_{i}"
             stride = strides[i]
             stage = ResNetStage(
                 block_type,
@@ -110,55 +109,49 @@ class ResNet(nn.Module):
                 stride,
             )
 
-            # Projection layer
-            if project_size is None:
-                projection = nn.Identity()
-            else:
-                projection = nn.Conv2d(output_size, project_size, 1, bias=False)
-
-            # Add layers
-            self.stages.append(stage)
-            self.projections.append(projection)
-
-    def forward(self, images):
-        x = self.input(images)
-        outputs = []
-        for stage, project in zip(self.stages, self.projections):
-            x = stage(x)
-            outputs.append(project(x))
-        return outputs
+            # add layer
+            self.stages.append(layer_name)
+            setattr(self, layer_name, stage)
 
 
 @backbones.register()
-def resnet_18(project_size: int | None = None):
+def resnet18():
     hidden_sizes = [64, 128, 256, 512]
     num_layers = [2, 2, 2, 2]
-    return ResNet(hidden_sizes, num_layers, ResidualBlock, project_size)
+    return ResNet(hidden_sizes, num_layers, ResidualBlock)
 
 
 @backbones.register()
-def resnet_34(project_size: int | None = None):
+def resnet34():
     hidden_sizes = [64, 128, 256, 512]
     num_layers = [3, 4, 6, 3]
-    return ResNet(hidden_sizes, num_layers, ResidualBlock, project_size)
+    return ResNet(hidden_sizes, num_layers, ResidualBlock)
 
 
 @backbones.register()
-def resnet_50(project_size: int | None = None):
+def resnet50():
     hidden_sizes = [64, 128, 256, 512, 2048]
     num_layers = [3, 4, 6, 3]
-    return ResNet(hidden_sizes, num_layers, BottleNeckBlock, project_size)
+    return ResNet(hidden_sizes, num_layers, BottleNeckBlock)
 
 
 @backbones.register()
-def resnet_tiny_26(project_size: int | None = None):
+def resnet26():
+    """Same as resnet18, but use BottleNeckBlock"""
+    hidden_sizes = [64, 128, 256, 512]
+    num_layers = [2, 2, 2, 2]
+    return ResNet(hidden_sizes, num_layers, BottleNeckBlock)
+
+
+@backbones.register()
+def tinyresnet26():
     hidden_sizes = [48, 96, 128, 256]
     num_layers = [2, 2, 2, 2]
-    return ResNet(hidden_sizes, num_layers, BottleNeckBlock, project_size)
+    return ResNet(hidden_sizes, num_layers, BottleNeckBlock)
 
 
 @backbones.register()
-def resnet_tiny_50(project_size: int | None = None):
+def tinyresnet50():
     hidden_sizes = [48, 96, 128, 256]
     num_layers = [3, 4, 6, 3]
-    return ResNet(hidden_sizes, num_layers, BottleNeckBlock, project_size)
+    return ResNet(hidden_sizes, num_layers, BottleNeckBlock)
