@@ -12,10 +12,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from megane.augment import Augmentation
-from megane.configs import ModelConfig, TrainConfig
+from megane.configs import ModelConfig, TrainConfig, MeganeConfig
 from megane.data import get_dataset
 from megane.models import Model, ModelAPI
-from megane.utils import compute_maf1, TimeoutException, time_limit
+from megane.utils import compute_maf1, TimeoutException, time_limit, init_from_ns
+from megane import registry
 from megane.processors import get_processor
 
 
@@ -78,8 +79,17 @@ def loop_loader(loader, total_steps: int):
                 return
 
 
+def init_model(config: MeganeConfig):
+    processor = init_from_ns(registry.processors, config.input_processor)
+    encoder = init_from_ns(registry.target_encoders, config.target_encoder)
+    decoder = init_from_ns(registry.target_decoders, config.target_decoder)
+    model = Model(config)
+    return model, processor, encoder, decoder
+
+
 class Trainer:
-    def __init__(self, train_config: TrainConfig, model_config: ModelConfig):
+    def __init__(self, config: MeganeConfig):
+        train_config = config.train_config
         train_data = train_config.train_data
         val_data = train_config.val_data
         dataloader_config = train_config.dataloader
@@ -88,24 +98,23 @@ class Trainer:
         print_every = train_config.print_every
         validate_every = train_config.validate_every
         lr = train_config.lr
-        logdir = f"logs/{model_config.name}-{datetime.now().isoformat()}"
+        logdir = f"logs/{config.name}-{datetime.now().isoformat()}"
 
         weight_dir = "weights"
-        self.best_weight_path = f"{weight_dir}/{model_config.best_weight_name}"
-        self.latest_weight_path = f"{weight_dir}/{model_config.latest_weight_name}"
+        self.best_weight_path = f"{weight_dir}/{config.best_weight_name}"
+        self.latest_weight_path = f"{weight_dir}/{config.latest_weight_name}"
 
         # Preprocessor
-        preprocess = get_processor(model_config)
+        self.model, self.preprocess, self.encode, self.decode = init_model(config)
 
         # Torch fabric
         self.fabric = Fabric(**fabric_config)
 
         # Model & optimization
-        self.model: ModelAPI = Model(model_config)
-        if model_config.continue_weight:
+        if config.continue_weight:
             load_weights(
                 self.model,
-                torch.load(model_config.continue_weight, map_location="cpu"),
+                torch.load(config.continue_weight, map_location="cpu"),
             )
         # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
@@ -130,19 +139,15 @@ class Trainer:
         def make_loader(data, augment: bool, **kwargs):
             # Transform function
             def transform(sample):
-                sample = preprocess(sample)
+                sample = self.preprocess(sample)
                 if augment:
                     sample = augmentation(sample)
-                enc = self.model.encode_sample(sample)
+                enc = self.encode(sample)
                 return enc
 
             # Dataset
-            data = get_dataset(
-                data,
-                classes=model_config.classes,
-                transform=transform,
-                single_class=model_config.single_class,
-            )
+            print("[trainer.py: 149] TODO: configurable num class for dataset")
+            data = get_dataset(data, transform=transform, **train_config.data_options)
 
             # Datalodaer
             loader = DataLoader(
@@ -232,7 +237,7 @@ class Trainer:
                 )
 
                 # Decode and visualize ground truth
-                gt_sample = model.decode_sample(
+                gt_sample = self.decode(
                     batch_get_index(images, b_idx),
                     batch_get_index(targets, b_idx),
                     ground_truth=True,

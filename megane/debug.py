@@ -12,6 +12,9 @@ formatter = logging.Formatter()
 
 
 def with_timer(f):
+    if "ic" not in globals():
+        return f
+
     @wraps(f)
     def wrapped(*args, **kwargs):
         a = time.perf_counter()

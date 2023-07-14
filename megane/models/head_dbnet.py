@@ -16,21 +16,60 @@ from megane.models.api import ModelAPI
 from megane.debug import with_timer
 
 
-from megane.registry import heads
+from megane.registry import heads, target_decoders, target_encoders
 
 
-class DBNetTransform:
-    r_encode: float = 0.4
-    r_decode: float = 1.5
+@target_encoders.register("dbnet")
+@dataclass
+class DBNetEncoder:
+    num_classes: int
+    shrink_rate: float = 0.4
     shrink: bool = True
     min_scale: float = 0.01
-    fixed_distance: float = -1
+    fixed_distance: float = None
 
-    def encode(self, sample: Sample):
-        pass
+    def __call__(self, sample: Sample):
+        targets = encode_dbnet(
+            sample,
+            num_classes=self.num_classes,
+            r=self.shrink_rate,
+            shrink=self.shrink_rate,
+            fixed_dist=self.fixed_distance,
+        )
+        images = TF.to_tensor(sample.image)
+        return images, targets
 
-    def decode(self, sample: Sample):
-        pass
+
+@target_decoders.register("dbnet")
+@dataclass
+class DBNetDecoder:
+    expand_rate: float = 1.5
+    expand: bool = True
+    min_scale: float = 0.01
+    fixed_distance: float = None
+
+    def __post_init__(self):
+        print("[head_dbnet.py: 52] TODO: rework the dbnet decode and encoder")
+
+    def __call__(self, images, outputs, ground_truth=False):
+        outputs = outputs[0].detach().cpu()
+        if not ground_truth:
+            outputs = self.post_process(outputs)
+
+        image = TF.to_pil_image(images.detach().cpu())
+        boxes, classes, scores = decode_dbnet(
+            outputs.numpy(),
+            self.expand_rate,
+            self.expand,
+            self.fixed_distance,
+        )
+        sample = Sample(
+            image=image,
+            boxes=boxes,
+            classes=classes,
+            scores=scores,
+        )
+        return sample
 
 
 @with_timer

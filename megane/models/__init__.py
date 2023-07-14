@@ -14,13 +14,6 @@ from megane.utils import init_from_ns
 from megane.registry import backbones, heads
 
 
-class necks:
-    from megane.models.neck_dbnet import NeckDBNet as dbnet
-    from megane.models.neck_fpnconcat import FPNConcat as fpn_concat
-
-    none = nn.Identity
-
-
 class Model(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -31,17 +24,7 @@ class Model(nn.Module):
             std=[0.229, 0.224, 0.225],
         )
         self.backbone = init_from_ns(backbones, config.backbone)
-        self.neck = init_from_ns(necks, config.neck)
-        try:
-            self.head = init_from_ns(heads, config.head, config)
-        except Exception:
-            self.head = init_from_ns(heads, config.head)
-
-        # Assign configs to allow access
-        self.head.config = config
-
-        # Ensure head is an ModelAPI compat
-        assert isinstance(self.head, ModelAPI)
+        self.head = init_from_ns(heads, config.head)
 
         # Delegation
         self.encode_sample = self.head.encode_sample
@@ -54,7 +37,6 @@ class Model(nn.Module):
     def forward(self, images: Tensor, targets: Tensor | None = None):
         images = self.preprocess(images)
         features = self.backbone(images)
-        features = self.neck(features)
         outputs = self.head(features, targets)
         return outputs
 

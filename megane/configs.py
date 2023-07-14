@@ -102,6 +102,9 @@ class TrainConfig(BaseModel):
             Dataloader config kwargs, default to `{}`
         fabric:
             Torch Fabric config, default to `dict(accelerator='auto')`
+
+        data_options (dict):
+            Option for datasets
     """
 
     train_data: str
@@ -117,22 +120,42 @@ class TrainConfig(BaseModel):
     dataloader: Dict = Field(default_factory=dict)
     fabric: Dict = Field(default_factory=default_fabric_config)
 
+    data_options: Dict
+
+
+class ModelConfigV2(BaseModel):
+    input_processor: Dict
+    target_encoder: Dict
+    target_decoder: Dict
+    backbone: Dict
+    head: Dict
+
 
 class ModelConfig(BaseModel):
     classes: List[str]
     name: str
-    image_size: int
     head: Dict
     backbone: Dict
+    input_process: Dict
     neck: Dict
-    resize_mode: str
 
     single_class: bool = False
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
 
-    def __post_init__(self):
-        assert self.resize_mode in ["resize", "letterbox"]
+
+class MeganeConfig(BaseModel):
+    input_processor: Dict
+    target_encoder: Dict
+    target_decoder: Dict
+    backbone: Dict
+    head: Dict
+    train_config: TrainConfig
+    name: Optional[str] = "unknown"
+
+    # Remove later
+    continue_weight: Optional[str] = None
+    inference_weight: Optional[str] = None
 
     # Stuffs for trainer
     @property

@@ -21,6 +21,7 @@ class Registry(dict):
 
 
 # Input preprocessors
+# Transform input but keep data type
 processors = Registry()
 
 # Model backbone
@@ -29,11 +30,10 @@ backbones = Registry()
 # Model heads
 heads = Registry()
 
-# Maybe remove this
-necks = Registry()
-
 # Target encoders
-encoders = Registry()
+# Transform input encode to torch tensor
+target_encoders = Registry()
 
 # Target decoders
-decoders = Registry()
+# Decode torch tensor to input date type
+target_decoders = Registry()

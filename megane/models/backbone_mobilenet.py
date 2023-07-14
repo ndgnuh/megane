@@ -2,7 +2,6 @@ from torch import nn
 from megane.registry import backbones
 
 
-@backbones.register(name="mobilenet_v2")
 class MV2Block(nn.Module):
     def __init__(self, in_channels, out_channels, expand, stride):
         super().__init__()
@@ -34,6 +33,7 @@ class MV2Block(nn.Module):
             return self.conv(img)
 
 
+@backbones.register(name="mobilenet_v2")
 class MobileNetV2(nn.Module):
     def default_config(self):
         # c, t, s, n
@@ -44,7 +44,12 @@ class MobileNetV2(nn.Module):
             [1, 2, 3, 4, 3, 3, 1],
         ]
 
-    def __init__(self, config=None, stem_size: int = 32, output_size: int = 1280):
+    def __init__(
+        self,
+        config=None,
+        stem_size: int = 32,
+        output_size: int = 1280,
+    ):
         super().__init__()
         if config is None:
             config = self.default_config()
