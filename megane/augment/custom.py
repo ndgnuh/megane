@@ -19,7 +19,8 @@ def replace_background(image, background, polygons):
     mask = mask * blend
     image = np.array(image)
     background = np.array(background.resize((w, h)).convert("RGB"))
-    image = image * mask + (~mask) * background
+    image = image * mask + (1 - mask) * background
+    image = image.astype("uint8")
     return Image.fromarray(image)
 
 
