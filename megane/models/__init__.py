@@ -5,7 +5,8 @@ from torchvision import transforms as T
 from megane.models import (
     backbone_vit,
     backbone_mobilenet,
-    backbone_fpn_resnet,
+    backbone_resnet,
+    backbone_fpn,
     head_dbnet,
 )
 from megane.models.api import ModelAPI

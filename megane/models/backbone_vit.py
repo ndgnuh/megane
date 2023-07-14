@@ -23,12 +23,9 @@ class SeparableSelfAttention(nn.Module):
 
 def Stem(hidden_size: int):
     return nn.Sequential(
-        nn.Conv2d(3, hidden_size, 3, stride=2, padding=1),
-        nn.InstanceNorm2d(hidden_size),
-        nn.Tanh(),
-        nn.Conv2d(hidden_size, hidden_size, 3, stride=2, padding=1),
-        nn.InstanceNorm2d(hidden_size),
-        nn.Tanh(),
+        nn.Conv2d(3, hidden_size, 7, stride=2, padding=3, bias=False),
+        nn.BatchNorm2d(hidden_size),
+        nn.ReLU(),
     )
 
 
@@ -97,53 +94,30 @@ class Stage(nn.Module):
         return x
 
 
-class ViTFPNBackbone(nn.Module):
-    def __init__(self, hidden_sizes, num_layers, project_size=None):
+class MobileViT(nn.Sequential):
+    def __init__(self, hidden_sizes, num_layers):
         super().__init__()
-        stages = []
-        projects = []
+        self.stem = Stem(hidden_sizes[0])
+
+        count = 0
         for item in zip(hidden_sizes, hidden_sizes[1:], num_layers):
             input_size, output_size, num_layer = item
             stage = Stage(input_size, output_size, num_layer)
-            if project_size is None:
-                project = nn.Identity()
-            else:
-                project = nn.Sequential(
-                    nn.Upsample(scale_factor=2, align_corners=True, mode="bilinear"),
-                    nn.Conv2d(output_size, project_size, 1),
-                )
-            stages.append(stage)
-            projects.append(project)
 
-        self.stem = Stem(hidden_sizes[0])
-        self.stages = nn.ModuleList(stages)
-        self.projects = nn.ModuleList(projects)
-
-    def forward(self, images):
-        x = self.stem(images)
-        outputs = []
-        for stage, project in zip(self.stages, self.projects):
-            x = stage(x)
-            outputs.append(project(x))
-        return outputs
+            stage_name = f"stage_{count}"
+            setattr(self, stage_name, stage)
+            count = count + 1
 
 
 @backbones.register()
-def mvit_18(project_size: int | None = None):
+def mobilevit18():
     hidden_sizes = [32, 64, 128, 192, 192]
     num_layers = [4, 4, 4, 4]
-    return ViTFPNBackbone(hidden_sizes, num_layers, project_size=project_size)
+    return MobileViT(hidden_sizes, num_layers)
 
 
 @backbones.register()
-def mvit_11(project_size: int | None = None):
-    hidden_sizes = [32, 64, 128, 192, 192]
-    num_layers = [3, 3, 3, 3]
-    return ViTFPNBackbone(hidden_sizes, num_layers, project_size=project_size)
-
-
-@backbones.register()
-def mvit_50(project_size: int | None = None):
+def mobilevit50():
     hidden_sizes = [64, 128, 256, 512, 512]
     num_layers = [3, 4, 6, 3]
-    return ViTFPNBackbone(hidden_sizes, num_layers, project_size=project_size)
+    return MobileViT(hidden_sizes, num_layers)
