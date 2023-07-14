@@ -33,7 +33,7 @@ class DBNetEncoder:
             sample,
             num_classes=self.num_classes,
             r=self.shrink_rate,
-            shrink=self.shrink_rate,
+            shrink=self.shrink,
             fixed_dist=self.fixed_distance,
         )
         images = TF.to_tensor(sample.image)
