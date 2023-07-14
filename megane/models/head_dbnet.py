@@ -5,6 +5,9 @@ import cv2
 import numpy as np
 import torch
 import simpoly
+from typing import Optional
+from functools import cached_property
+
 from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
@@ -26,7 +29,7 @@ class DBNetEncoder:
     shrink_rate: float = 0.4
     shrink: bool = True
     min_scale: float = 0.01
-    fixed_distance: float = None
+    fixed_distance: Optional[float] = None
 
     def __call__(self, sample: Sample):
         targets = encode_dbnet(
@@ -47,6 +50,14 @@ class DBNetDecoder:
     expand: bool = True
     min_scale: float = 0.01
     fixed_distance: float = None
+    morph_open: Optional[int] = None
+
+    @cached_property
+    def morph_kernel(self):
+        if self.morph_open is None:
+            return None
+        ksize = [self.morph_open] * 2
+        return cv2.getStructuringElement(cv2.MORPH_RECT, ksize)
 
     def __post_init__(self):
         print("[head_dbnet.py: 52] TODO: rework the dbnet decode and encoder")
@@ -54,7 +65,7 @@ class DBNetDecoder:
     def __call__(self, images, outputs, ground_truth=False):
         outputs = outputs[0].detach().cpu()
         if not ground_truth:
-            outputs = self.post_process(outputs)
+            outputs = torch.sigmoid(outputs * 50)
 
         image = TF.to_pil_image(images.detach().cpu())
         boxes, classes, scores = decode_dbnet(
@@ -62,6 +73,7 @@ class DBNetDecoder:
             self.expand_rate,
             self.expand,
             self.fixed_distance,
+            self.morph_kernel,
         )
         sample = Sample(
             image=image,
@@ -146,6 +158,7 @@ def decode_dbnet(
     expand_rate: float = 1.5,
     shrink: bool = True,
     fixed_dist: float = None,
+    morph_kernel=None,
 ):
     C, H, W = proba_maps.shape
 
@@ -154,12 +167,14 @@ def decode_dbnet(
     boxes = []
     for cls, proba_map in enumerate(proba_maps):
         mask = (proba_map > 0.2).astype("uint8")
+        if morph_kernel is not None:
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=morph_kernel)
         cnts, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         for cnt in cnts:
             A = cv2.contourArea(cnt)
             L = cv2.arcLength(cnt, True)
             D = abs(A * expand_rate / (L + 1e-3))
-            if D == 0:
+            if D == 0 and expand_rate > 0:
                 continue
 
             if fixed_dist is not None:

@@ -27,8 +27,6 @@ class Model(nn.Module):
         self.head = init_from_ns(heads, config.head)
 
         # Delegation
-        self.encode_sample = self.head.encode_sample
-        self.decode_sample = self.head.decode_sample
         self.compute_loss = self.head.compute_loss
         self.collate_fn = self.head.collate_fn
         self.visualize_outputs = self.head.visualize_outputs

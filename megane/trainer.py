@@ -258,7 +258,7 @@ class Trainer:
                     # Put on a timer because they tends to get really long at first
                     with time_limit(5):
                         # Decode and visualize prediction
-                        pr_sample = model.decode_sample(
+                        pr_sample = self.decode(
                             batch_get_index(images, b_idx),
                             batch_get_index(outputs, b_idx),
                         )
@@ -327,8 +327,8 @@ class Trainer:
                 _outputs = batch_get_index(outputs, i)
                 _targets = batch_get_index(targets, i)
 
-                pr_sample = model.decode_sample(_inputs, _outputs)
-                gt_sample = model.decode_sample(_inputs, _targets, ground_truth=True)
+                pr_sample = self.decode(_inputs, _outputs)
+                gt_sample = self.decode(_inputs, _targets, ground_truth=True)
                 predictions.append(pr_sample)
                 ground_truths.append(gt_sample)
                 raw_outputs.append(_outputs)
