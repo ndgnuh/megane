@@ -2,26 +2,23 @@ from argparse import ArgumentParser
 from os import path
 
 import torch
+from torchvision.transforms import functional as TF
 from torch.onnx import export
+from PIL import Image
 
-from megane import Model, ModelConfig
+from megane import Model, MeganeConfig, Sample, init_model
 
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--config", "-c", required=True)
-    parser.add_argument("--output", "-o")
+    parser.add_argument("config")
+    parser.add_argument("output", default=None)
 
     args = parser.parse_args()
-    config = ModelConfig.from_file(args.config)
-    assert (
-        config.inference_weight is not None
-    ), "No pretrained weight, the model is useless"
+    config = MeganeConfig.from_file(args.config)
 
     # Load model
-    model = Model(config)
-    weight = torch.load(config.inference_weight, map_location="cpu")
-    model.load_state_dict(weight)
+    model, processor, _, _ = init_model(config)
     model.set_infer(True)
 
     # OUtput file
@@ -31,12 +28,16 @@ def main():
         output_file = path.splitext(args.config)[0]
         output_file = path.basename(f"{output_file}.onnx")
 
-    # Example input
-    sz = (1, 3, config.image_size, config.image_size)
-    example_input = torch.zeros(sz)
+    # Pseudo input
+    image = Image.new("RGB", (1000, 1000), 0)
+    sample = Sample(image)
+    sample = processor(sample)
+    inputs = TF.to_tensor(sample.image).unsqueeze(0)
+
+    # Export
     export(
         model,
-        example_input,
+        inputs,
         output_file,
         do_constant_folding=True,
         input_names=["images"],
