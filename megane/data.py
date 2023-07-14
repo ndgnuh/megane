@@ -66,7 +66,7 @@ class Sample:
         draw = ImageDraw.Draw(image)
         for polygon, class_id in zip(self.boxes, self.classes):
             xy = [(int(x * w), int(y * h)) for (x, y) in polygon]
-            draw.polygon(xy, outline=colors[class_id], width=10)
+            draw.polygon(xy, outline=colors[class_id], width=2)
         return image
 
     def visualize_tensor(self, *a, **k):
