@@ -156,6 +156,7 @@ class MeganeConfig(BaseModel):
     head: Dict
     train_config: TrainConfig
     name: Optional[str] = "unknown"
+    weights: List[str] = Field(default_factory=list)
 
     __global__: Optional[Dict] = None
 

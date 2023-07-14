@@ -84,6 +84,14 @@ def init_model(config: MeganeConfig):
     encoder = init_from_ns(registry.target_encoders, config.target_encoder)
     decoder = init_from_ns(registry.target_decoders, config.target_decoder)
     model = Model(config)
+
+    for weight in config.weights:
+        if not path.isfile(weight):
+            print("Weight {weight} not found, skipping loading it")
+            continue
+
+        weight = torch.load(weight, map_location="cpu")
+        load_weights(model, weight)
     return model, processor, encoder, decoder
 
 
@@ -111,11 +119,6 @@ class Trainer:
         self.fabric = Fabric(**fabric_config)
 
         # Model & optimization
-        if config.continue_weight:
-            load_weights(
-                self.model,
-                torch.load(config.continue_weight, map_location="cpu"),
-            )
         # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
         self.lr_scheduler = lr_scheduler.OneCycleLR(
@@ -123,7 +126,7 @@ class Trainer:
             max_lr=train_config.lr,
             total_steps=train_config.total_steps,
             div_factor=10,
-            pct_start=0.01,
+            pct_start=30 / train_config.total_steps,
         )
 
         # Dataloader

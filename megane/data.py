@@ -100,10 +100,16 @@ def load_sample_labelme(sample_path, classes, single_class: bool):
     with open(sample_path, encoding="utf-8") as f:
         data = json.load(f)
     shapes = data["shapes"]
-    width = data["imageWidth"]
-    height = data["imageHeight"]
     image_path = data["imagePath"]
     image_data = data["imageData"]
+
+    if image_data is not None:
+        image = utils.bytes2pillow(b64decode(image_data))
+    else:
+        image_path = path.join(path.dirname(sample_path), image_path)
+        image = Image.open(image_path)
+
+    width, height = image.size
 
     boxes = pvector()
     class_indices = pvector()
@@ -132,11 +138,6 @@ def load_sample_labelme(sample_path, classes, single_class: bool):
 
     assert len(class_indices) == len(boxes)
 
-    if image_data is not None:
-        image = utils.bytes2pillow(b64decode(image_data))
-    else:
-        image_path = path.join(path.dirname(sample_path), image_path)
-        image = Image.open(image_path)
     return Sample(image=image, boxes=boxes, classes=class_indices)
 
 
