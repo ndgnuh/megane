@@ -2,7 +2,6 @@ from os import path
 from typing import Dict, List, Optional, Union
 
 import yaml
-import chevron
 from pydantic import BaseModel as _BaseModel
 from pydantic import Field
 
