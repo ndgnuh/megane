@@ -23,9 +23,12 @@ import simpoly
 from PIL import Image
 from lenses import bind
 
+from megane.registry import processors
 from megane.data import Sample
+from megane.utils import init_from_ns
 
 
+@processors.register(name="letterbox")
 @dataclass
 class Letterbox:
     image_size: Tuple[int, int]
@@ -71,6 +74,7 @@ class Letterbox:
         return sample
 
 
+@processors.register(name="resize")
 @dataclass
 class Resize:
     """Resize the image inside a sample, returns a new sample.
@@ -87,16 +91,5 @@ class Resize:
         return new_sample
 
 
-def get_processor(
-    kind: str,
-    image_size: int,
-    fill_value: Tuple[int, int] = (127, 127, 127),
-):
-    if isinstance(image_size, int):
-        image_size = (image_size, image_size)
-    if kind == "resize":
-        return Resize(image_size)
-    elif kind == "letterbox":
-        return Letterbox(image_size, fill_value)
-    else:
-        raise NotImplementedError(f"Unknown process type {kind}")
+def get_processor(config):
+    return init_from_ns(processors, config.input_process)

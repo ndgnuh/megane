@@ -95,10 +95,7 @@ class Trainer:
         self.latest_weight_path = f"{weight_dir}/{model_config.latest_weight_name}"
 
         # Preprocessor
-        preprocess = get_processor(
-            kind=model_config.resize_mode,
-            image_size=model_config.image_size,
-        )
+        preprocess = get_processor(model_config)
 
         # Torch fabric
         self.fabric = Fabric(**fabric_config)
@@ -117,7 +114,7 @@ class Trainer:
             max_lr=train_config.lr,
             total_steps=train_config.total_steps,
             div_factor=10,
-            pct_start=0.1,
+            pct_start=0.01,
         )
 
         # Dataloader

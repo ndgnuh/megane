@@ -20,6 +20,20 @@ class Registry(dict):
         return self[name]
 
 
-heads = Registry()
+# Input preprocessors
+processors = Registry()
+
+# Model backbone
 backbones = Registry()
+
+# Model heads
+heads = Registry()
+
+# Maybe remove this
 necks = Registry()
+
+# Target encoders
+encoders = Registry()
+
+# Target decoders
+decoders = Registry()
