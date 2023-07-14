@@ -15,6 +15,7 @@ from megane.data import Sample
 from megane.models.api import ModelAPI
 from megane.debug import with_timer
 
+
 from megane.registry import heads
 
 
@@ -335,8 +336,7 @@ class DBNet(ModelAPI):
         sz = sample.image.size
         num_classes = self.num_classes
         shrink_rate = self.shrink_rate
-        sample = bind(sample).image.set(sample.image.resize([sz, sz]))
-        image = utils.prepare_input(sample.image, sz, sz, self.resize_mode)
+        image = TF.to_tensor(sample.image)
         targets = encode_dbnet(
             sample,
             num_classes,
