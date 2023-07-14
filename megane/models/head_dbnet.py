@@ -223,7 +223,6 @@ class PredictionConv(nn.Module):
 class DBNet(ModelAPI):
     def __init__(
         self,
-        image_size: int,
         hidden_size: int,
         num_classes: int,
         shrink_rate: float = 0.4,
@@ -333,7 +332,7 @@ class DBNet(ModelAPI):
         return loss
 
     def encode_sample(self, sample: Sample):
-        sz = self.image_size
+        sz = sample.image.size
         num_classes = self.num_classes
         shrink_rate = self.shrink_rate
         sample = bind(sample).image.set(sample.image.resize([sz, sz]))
