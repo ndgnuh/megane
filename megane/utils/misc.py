@@ -3,6 +3,7 @@ from functools import wraps
 from inspect import currentframe
 from typing import Dict
 from contextlib import contextmanager
+from copy import copy
 
 
 class TimeoutException(Exception):
@@ -105,5 +106,6 @@ def init_from_ns(ns, config: Dict):
     Returns:
         The initialized instance.
     """
+    config = copy(config)
     kind = config.pop("type")
     return getattr(ns, kind)(**config)
