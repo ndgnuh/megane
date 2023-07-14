@@ -23,7 +23,6 @@ class necks:
 class Model(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.image_size = config.image_size
 
         # Backbone
         self.preprocess = T.Normalize(
