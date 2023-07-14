@@ -1,8 +1,0 @@
-train_data: data/train.txt
-val_data: data/val.txt
-
-total_steps: 1_000_000
-validate_every: 1000
-print_every: 200
-
-lr: 1e-4
