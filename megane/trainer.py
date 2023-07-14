@@ -123,7 +123,7 @@ class Trainer:
             max_lr=train_config.lr,
             total_steps=train_config.total_steps,
             div_factor=10,
-            pct_start=0.01,
+            pct_start=30 / train_config.total_steps,
         )
 
         # Dataloader
