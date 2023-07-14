@@ -156,8 +156,6 @@ class MeganeConfig(BaseModel):
     name: Optional[str] = "unknown"
     weights: List[str] = Field(default_factory=list)
 
-    __global__: Optional[Dict] = None
-
     # Remove later
     continue_weight: Optional[str] = None
     inference_weight: Optional[str] = None
