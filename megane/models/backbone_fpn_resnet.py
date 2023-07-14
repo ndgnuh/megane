@@ -1,6 +1,7 @@
 from typing import List
 
 from torch import nn
+from megane.registry import backbones
 
 
 def ConvNorm(*a, **k):
@@ -128,30 +129,35 @@ class ResNet(nn.Module):
         return outputs
 
 
+@backbones.register()
 def resnet_18(project_size: int | None = None):
     hidden_sizes = [64, 128, 256, 512]
     num_layers = [2, 2, 2, 2]
     return ResNet(hidden_sizes, num_layers, ResidualBlock, project_size)
 
 
+@backbones.register()
 def resnet_34(project_size: int | None = None):
     hidden_sizes = [64, 128, 256, 512]
     num_layers = [3, 4, 6, 3]
     return ResNet(hidden_sizes, num_layers, ResidualBlock, project_size)
 
 
+@backbones.register()
 def resnet_50(project_size: int | None = None):
     hidden_sizes = [64, 128, 256, 512, 2048]
     num_layers = [3, 4, 6, 3]
     return ResNet(hidden_sizes, num_layers, BottleNeckBlock, project_size)
 
 
+@backbones.register()
 def resnet_tiny_26(project_size: int | None = None):
     hidden_sizes = [48, 96, 128, 256]
     num_layers = [2, 2, 2, 2]
     return ResNet(hidden_sizes, num_layers, BottleNeckBlock, project_size)
 
 
+@backbones.register()
 def resnet_tiny_50(project_size: int | None = None):
     hidden_sizes = [48, 96, 128, 256]
     num_layers = [3, 4, 6, 3]

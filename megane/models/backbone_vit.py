@@ -1,4 +1,5 @@
 from torch import nn
+from megane.registry import backbones
 
 
 class SeparableSelfAttention(nn.Module):
@@ -127,18 +128,21 @@ class ViTFPNBackbone(nn.Module):
         return outputs
 
 
+@backbones.register()
 def mvit_18(project_size: int | None = None):
     hidden_sizes = [32, 64, 128, 192, 192]
     num_layers = [4, 4, 4, 4]
     return ViTFPNBackbone(hidden_sizes, num_layers, project_size=project_size)
 
 
+@backbones.register()
 def mvit_11(project_size: int | None = None):
     hidden_sizes = [32, 64, 128, 192, 192]
     num_layers = [3, 3, 3, 3]
     return ViTFPNBackbone(hidden_sizes, num_layers, project_size=project_size)
 
 
+@backbones.register()
 def mvit_50(project_size: int | None = None):
     hidden_sizes = [64, 128, 256, 512, 512]
     num_layers = [3, 4, 6, 3]

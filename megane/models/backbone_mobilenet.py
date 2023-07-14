@@ -1,6 +1,8 @@
 from torch import nn
+from megane.registry import backbones
 
 
+@backbones.register(name="mobilenet_v2")
 class MV2Block(nn.Module):
     def __init__(self, in_channels, out_channels, expand, stride):
         super().__init__()
