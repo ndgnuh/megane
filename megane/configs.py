@@ -1,6 +1,8 @@
 from os import path
 from typing import Dict, List, Optional, Union
 
+import yaml
+import chevron
 from pydantic import BaseModel as _BaseModel
 from pydantic import Field
 
@@ -17,6 +19,8 @@ def read(config_path):
 
     with open(config_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+        config.pop("__global__")
+
     if "name" not in config:
         config["name"] = path.splitext(path.basename(config_path))[0]
     return config
@@ -152,6 +156,8 @@ class MeganeConfig(BaseModel):
     head: Dict
     train_config: TrainConfig
     name: Optional[str] = "unknown"
+
+    __global__: Optional[Dict] = None
 
     # Remove later
     continue_weight: Optional[str] = None

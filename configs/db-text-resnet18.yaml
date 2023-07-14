@@ -1,0 +1,49 @@
+__global__:
+  - &num_classes 2
+  - &hidden_size 128
+
+input_processor:
+  type: resize
+  image_size: [1024, 1024]
+
+target_encoder:
+  num_classes: *num_classes
+  type: dbnet
+
+target_decoder:
+  type: dbnet
+
+backbone:
+  type: fpn_resnet18
+  out_channels: *hidden_size
+
+head:
+  type: dbnet
+  hidden_size: *hidden_size
+  num_classes: *num_classes
+
+train_config:
+  data_options:
+    classes:
+      - text
+      - noise
+    single_class: false
+
+  train_data: data/train.txt
+  val_data: data/val.txt
+
+  total_steps: 10_000
+  validate_every: 4_000
+  print_every: 10
+
+  lr: 1e-4
+
+  dataloader:
+    batch_size: 2
+    num_workers: 1
+
+  augment:
+    enabled: false
+    background_images: data/backgrounds.txt
+    # domain_images: data/background.txt
+
