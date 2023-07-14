@@ -18,7 +18,6 @@ def read(config_path):
 
     with open(config_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
-        config.pop("__global__")
 
     if "name" not in config:
         config["name"] = path.splitext(path.basename(config_path))[0]
