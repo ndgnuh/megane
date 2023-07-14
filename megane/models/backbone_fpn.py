@@ -1,137 +1,101 @@
-from collections import OrderedDict
 from typing import List
 
 import torch
-from torch import nn, no_grad
-from torchvision import models as vision_models
-from torchvision.models._utils import IntermediateLayerGetter
-from torchvision.ops import FeaturePyramidNetwork
+from torch import nn
+from torchvision import models
+
+from megane.registry import backbones
 
 
-def _conv_norm_act(in_channels: int, out_channels: int, *a, **k):
-    """Return a Conv Norm Activation Sequence
-
-    Args:
-        All the argument of `nn.Conv2d`
-
-    Keywords:
-        Conv:
-            Type of convolution layer to use.
-            Its initialization must be compatible with the one of `nn.Conv2d`.
-            Default: `nn.Conv2d`
-        All the keyword argument of `nn.Conv2d`.
-
-    Returns:
-        A `nn.Sequential` of Conv, `nn.InstanceNorm2d` and `nn.ReLU`
-    """
-    if "Conv" in k:
-        Conv = k.pop("Conv")
-    else:
-        Conv = nn.Conv2d
-    return nn.Sequential(
-        Conv(in_channels, out_channels, *a, **k),
-        nn.InstanceNorm2d(out_channels),
-        nn.ReLU(),
-    )
-
-
-class UpscaleConcat(nn.Module):
-    """Upscale each feature map and concat them with the next one,
-    repeat until all feature maps are concatenated.
-
-    Args:
-        feature_size:
-            Number of channels `C` of each feature returned by FPN.
-        num_upscales:
-            Number of features to be upscaled and concatenated.
-
-    Inputs:
-        features:
-            An ordered dict mapping from name to features.
-            The name does not matter.
-            Each feature map has the shape [N, C, H(i), W(i)] and H(i+1) = 2 * H(i).
-
-    Examples:
-        from collections import OrderedDict
-        import torch
-        neck = UpscaleConcat(56, 4)
-        features = {str(i): torch.rand(1, 56, 10 * i, 10 * i) for i in [1, 2, 4, 8]}
-        features = OrderedDict(reversed(features.items())
-        torch.Size([1, 224, 160, 160])
-    """
-
-    def __init__(self, feature_size: int, num_upscales: int):
+class HiddenLayerGetter(nn.Module):
+    def __init__(self, model, positions):
         super().__init__()
-        upscales = []
-        for idx in range(num_upscales):
-            channels = feature_size * (idx + 1)
-            conv = nn.Sequential(
-                nn.ConvTranspose2d(channels, channels, 2, stride=2, groups=channels),
-                nn.InstanceNorm2d(channels),
-                nn.ReLU(),
-                nn.Conv2d(channels, channels, 1),
-                nn.InstanceNorm2d(channels),
-                nn.ReLU(),
-            )
-            upscales.append(conv)
-        self.upscales = nn.ModuleList(upscales)
+        self.model = model
+        self.masks = len(model) * [False]
+        for i in positions:
+            self.masks[i] = True
 
-    def forward(self, features: OrderedDict):
-        output = None
-        count = 0
-        for k, feature in reversed(features.items()):
-            upscale = self.upscales[count]
-            count = count + 1
-            if output is None:
-                output = upscale(feature)
+    @torch.no_grad()
+    def get_out_channels(self):
+        inputs = torch.rand(1, 3, 768, 768)
+        return [output.shape[1] for output in self(inputs)]
+
+    def forward(self, inputs) -> List:
+        x = inputs
+        outputs = []
+        for keep, layer in zip(self.masks, self.model):
+            x = layer(x)
+            keep and outputs.append(x)
+        return outputs
+
+
+class FeaturePyramidNeck(nn.Module):
+    def __init__(self, list_in_channels, out_channels):
+        super().__init__()
+        hidden_channels = out_channels // len(list_in_channels)
+        self.upsample = nn.Upsample(scale_factor=2, align_corners=True, mode="bilinear")
+        self.in_branch = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels, 1, bias=False),
+                    nn.BatchNorm2d(out_channels),
+                    nn.ReLU(True),
+                )
+                for in_channels in list_in_channels
+            ]
+        )
+        self.out_branch = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(out_channels, hidden_channels, 3, padding=1, bias=False),
+                    nn.BatchNorm2d(hidden_channels),
+                    nn.ReLU(),
+                    nn.Upsample(
+                        scale_factor=2**idx, mode="bilinear", align_corners=True
+                    ),
+                )
+                for idx, _ in enumerate(list_in_channels)
+            ]
+        )
+
+        self.num_branches = len(list_in_channels)
+
+    def forward(self, features: List):
+        assert len(features) == self.num_branches
+        # Input features
+        features = [layer(ft) for layer, ft in zip(self.in_branch, features)]
+
+        # Upscale combine
+        outputs = [features[-1]]
+        for i, ft in enumerate(reversed(features)):
+            if i == 0:
+                outputs.append(ft)
             else:
-                output = torch.cat([output, feature], dim=1)
-                output = upscale(output)
-        return output
+                output = self.upsample(outputs[-1])
+                output = output + ft
+                outputs.append(output)
 
-
-class FPNBackbone(nn.Module):
-    def __init__(
-        self,
-        arch: str,
-        hidden_size: int,
-        layers: List[int],
-        feature_module: str | None = None,
-    ):
-        super().__init__()
-        self.arch = arch
-        self.num_layers = len(layers)
-
-        # Feature extractor
-        self.backbone = self._mk_backbone(arch, feature_module)
-
-        # FPN
-        self.fpn = self._mk_fpn()
-
-    def _mk_backbone(self, arch, feature_module):
-        arch = self.config.backbone.arch
-        feature_module = self.config.backbone.feature_module
-        layers = self.config.backbone.layers
-
-        features = getattr(vision_models, arch)(num_classes=1)
-        if feature_module is not None:
-            features = getattr(features, feature_module)
-        layers = {str(layer): str(i) for i, layer in enumerate(layers)}
-        backbone = IntermediateLayerGetter(features, layers)
-        return backbone
-
-    @no_grad()
-    def _mk_fpn(self):
-        image_size = self.config.image_size
-        hidden_size = self.config.hidden_size
-
-        image = torch.rand(1, 3, image_size, image_size)
-        features = self.backbone(image)
-        channels = [ft.shape[1] for ft in features.values()]
-        fpn = FeaturePyramidNetwork(channels, hidden_size // len(channels))
-        return fpn
-
-    def forward(self, images):
-        features = self.backbone(images)
-        features = self.fpn(features)
+        # Upscale concat
+        features = [layer(ft) for layer, ft in zip(self.out_branch, reversed(outputs))]
+        features = torch.cat(features, dim=1)
         return features
+
+
+class FeaturePyramidNetwork(nn.Sequential):
+    def __init__(self, net, imm_layers, out_channels: int):
+        super().__init__()
+        self.backbone = HiddenLayerGetter(net, imm_layers)
+        self.fpn = FeaturePyramidNeck(self.backbone.get_out_channels(), out_channels)
+
+
+@backbones.register()
+def fpn_mobilenet_v3_large(out_channels: int):
+    net = models.mobilenet_v3_large(weights=models.MobileNet_V3_Large_Weights).features
+    return FeaturePyramidNetwork(net, [3, 6, 9, 16], out_channels)
+
+
+@backbones.register()
+def fpn_mobilenet_v3_small(out_channels):
+    net = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights).features
+    model = FeaturePyramidNetwork(net, [1, 3, 8, 12], out_channels)
+    return model
