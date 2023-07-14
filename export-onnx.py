@@ -18,7 +18,8 @@ def main():
     config = MeganeConfig.from_file(args.config)
 
     # Load model
-    model, processor, _, _ = init_model(config)
+    model, processor, _, _ = init_model(config, force_weights=True)
+    model = model.eval()
     model.set_infer(True)
 
     # OUtput file

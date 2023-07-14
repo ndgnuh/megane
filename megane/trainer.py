@@ -79,12 +79,13 @@ def loop_loader(loader, total_steps: int):
                 return
 
 
-def init_model(config: MeganeConfig):
+def init_model(config: MeganeConfig, force_weights: bool = False):
     processor = init_from_ns(registry.processors, config.input_processor)
     encoder = init_from_ns(registry.target_encoders, config.target_encoder)
     decoder = init_from_ns(registry.target_decoders, config.target_decoder)
     model = Model(config)
 
+    loaded_weight = False
     for weight in config.weights:
         if not path.isfile(weight):
             print("Weight {weight} not found, skipping loading it")
@@ -92,6 +93,11 @@ def init_model(config: MeganeConfig):
 
         weight = torch.load(weight, map_location="cpu")
         load_weights(model, weight)
+        loaded_weight = True
+
+    if force_weights:
+        assert loaded_weight, "No weights were loaded"
+
     return model, processor, encoder, decoder
 
 
