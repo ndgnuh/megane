@@ -1,4 +1,6 @@
 # Reference: https://arxiv.org/abs/1911.08947
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 import torch
@@ -16,8 +18,28 @@ from megane.debug import with_timer
 from megane.registry import heads
 
 
-# @with_timer
-def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4, shrink: bool = True):
+class DBNetTransform:
+    r_encode: float = 0.4
+    r_decode: float = 1.5
+    shrink: bool = True
+    min_scale: float = 0.01
+    fixed_distance: float = -1
+
+    def encode(self, sample: Sample):
+        pass
+
+    def decode(self, sample: Sample):
+        pass
+
+
+@with_timer
+def encode_dbnet(
+    sample: Sample,
+    num_classes: int,
+    r: float = 0.4,
+    shrink: bool = True,
+    fixed_dist: int = None,
+):
     boxes = sample.boxes
     W, H = sample.image.size
     classes = sample.classes
@@ -31,11 +53,16 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4, shrink: bool 
     if len(classes) == 0:
         return proba_maps, threshold_maps
 
-    canvas = np.zeros((H, W), dtype="float32")
     max_size = max(H, W) * 2
     for xy, cls in zip(boxes, classes):
         box = xy
-        d = simpoly.get_shrink_dist(box, r)
+
+        # Fixed distance or dynamic
+        if fixed_dist is None:
+            d = simpoly.get_shrink_dist(box, r)
+        else:
+            d = fixed_dist
+
         if shrink:
             sbox = np.array(simpoly.offset(box, d), dtype=int)
         else:
@@ -47,12 +74,18 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4, shrink: bool 
 
         # Threshold map draw
         # Draw through a canvas
+        canvas = np.zeros((H, W), dtype="float32")
         canvas = cv2.fillConvexPoly(canvas, ebox, 1)
         canvas = cv2.fillConvexPoly(canvas, sbox, 0)
-        threshold_maps[cls] += canvas
-
-        # clear canvas
-        canvas = cv2.fillConvexPoly(canvas, ebox, 0)
+        # dist = cv2.distanceTransform(canvas, cv2.DIST_L2, 3)
+        # cv2.normalize(
+        #     dist,
+        #     dist,
+        #     norm_type=cv2.NORM_MINMAX,
+        #     alpha=0,
+        #     beta=1,
+        # )
+        threshold_maps[cls] = np.maximum(threshold_maps[cls], canvas)
 
     proba_maps = np.clip(proba_maps, 0, 1)
     threshold_maps = np.clip(threshold_maps, 0, 1)
@@ -68,7 +101,12 @@ def _compute_score(proba_map, rect):
     return score
 
 
-def decode_dbnet(proba_maps, expand_rate: float = 1.5, shrink: bool = True):
+def decode_dbnet(
+    proba_maps,
+    expand_rate: float = 1.5,
+    shrink: bool = True,
+    fixed_dist: float = None,
+):
     C, H, W = proba_maps.shape
 
     classes = []
@@ -83,6 +121,9 @@ def decode_dbnet(proba_maps, expand_rate: float = 1.5, shrink: bool = True):
             D = abs(A * expand_rate / (L + 1e-3))
             if D == 0:
                 continue
+
+            if fixed_dist is not None:
+                D = fixed_dist
 
             # cnt = cv2.approxPolyDP(cnt, L * 0.01, True)
             box = cnt[:, 0, :].tolist()
@@ -189,6 +230,7 @@ class DBNet(ModelAPI):
         expand_rate: float = 1.5,
         shrink: bool = True,
         resize_mode: str = "resize",
+        fixed_dist: float = None,
     ):
         super().__init__()
         utils.save_args()
@@ -296,7 +338,13 @@ class DBNet(ModelAPI):
         shrink_rate = self.shrink_rate
         sample = bind(sample).image.set(sample.image.resize([sz, sz]))
         image = utils.prepare_input(sample.image, sz, sz, self.resize_mode)
-        targets = encode_dbnet(sample, num_classes, shrink_rate, shrink=self.shrink)
+        targets = encode_dbnet(
+            sample,
+            num_classes,
+            shrink_rate,
+            shrink=self.shrink,
+            fixed_dist=self.fixed_dist,
+        )
         return image, targets
 
     def post_process(self, probas):
@@ -331,6 +379,7 @@ class DBNet(ModelAPI):
             outputs.numpy(),
             self.expand_rate,
             self.shrink,
+            self.fixed_dist,
         )
         sample = Sample(
             image=image,
