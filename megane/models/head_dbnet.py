@@ -13,6 +13,8 @@ from megane.data import Sample
 from megane.models.api import ModelAPI
 from megane.debug import with_timer
 
+from megane.registry import heads
+
 
 # @with_timer
 def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4, shrink: bool = True):
@@ -30,6 +32,7 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4, shrink: bool 
         return proba_maps, threshold_maps
 
     canvas = np.zeros((H, W), dtype="float32")
+    max_size = max(H, W) * 2
     for xy, cls in zip(boxes, classes):
         box = xy
         d = simpoly.get_shrink_dist(box, r)
@@ -37,7 +40,7 @@ def encode_dbnet(sample: Sample, num_classes: int, r: float = 0.4, shrink: bool 
             sbox = np.array(simpoly.offset(box, d), dtype=int)
         else:
             sbox = np.array(box, dtype=int)
-        ebox = np.array(simpoly.offset(box, -d), dtype=int)
+        ebox = np.clip(simpoly.offset(box, -d), 0, np.inf).astype(int)
 
         # Draw probability map
         cv2.fillConvexPoly(proba_maps[cls], sbox, 1)
@@ -175,6 +178,7 @@ class PredictionConv(nn.Module):
         return x
 
 
+@heads.register("dbnet")
 class DBNet(ModelAPI):
     def __init__(
         self,

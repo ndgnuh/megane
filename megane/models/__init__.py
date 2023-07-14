@@ -2,23 +2,15 @@ import torch
 from torch import Tensor, nn
 from torchvision import transforms as T
 
+from megane.models import (
+    backbone_vit,
+    backbone_mobilenet,
+    backbone_fpn_resnet,
+    head_dbnet,
+)
 from megane.models.api import ModelAPI
 from megane.utils import init_from_ns
-
-
-class backbones:
-    from megane.models.backbone_fpn_resnet import (
-        resnet_18,
-        resnet_34,
-        resnet_50,
-        resnet_tiny_26,
-        resnet_tiny_50,
-    )
-    from megane.models.backbone_mobilenet import MobileNetV2 as mobilenet_v2
-    from megane.models.backbone_vit import mvit_11, mvit_18, mvit_50
-
-    # from .backbone_fpn import FPNBackbone as fpn
-    # from .backbone_fvit import FViTBackbone as fvit
+from megane.registry import backbones, heads
 
 
 class necks:
@@ -26,11 +18,6 @@ class necks:
     from megane.models.neck_fpnconcat import FPNConcat as fpn_concat
 
     none = nn.Identity
-
-
-class heads:
-    from megane.models.head_dbnet import DBNet as dbnet
-    from megane.models.head_dbgnet import DBNet as dbgnet
 
 
 class Model(nn.Module):
