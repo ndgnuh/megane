@@ -1,6 +1,8 @@
+import math
 import random
 from datetime import datetime
 from os import makedirs, path
+from functools import partial
 
 import numpy as np
 import torch
@@ -127,12 +129,10 @@ class Trainer:
         # Model & optimization
         # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
-        self.lr_scheduler = lr_scheduler.OneCycleLR(
+        self.lr_scheduler = ConsineDecayWithWarmup(
             self.optimizer,
-            max_lr=train_config.lr,
             total_steps=train_config.total_steps,
-            div_factor=10,
-            pct_start=30 / train_config.total_steps,
+            num_wramup_steps=30,
         )
 
         # Dataloader
@@ -380,3 +380,26 @@ class Trainer:
 
     def log_text(self, tag, txt, step):
         self.logger.add_text(tag, f"```\n{txt}\n```", step)
+
+
+def _cosine_decay_warmup(iteration, warmup_iterations, total_iterations):
+    """
+    Linear warmup from 0 --> 1.0, then decay using cosine decay to 0.0
+    """
+    if iteration <= warmup_iterations:
+        multiplier = iteration / warmup_iterations
+    else:
+        multiplier = (iteration - warmup_iterations) / (
+            total_iterations - warmup_iterations
+        )
+        multiplier = 0.5 * (1 + math.cos(math.pi * multiplier))
+    return multiplier
+
+
+def ConsineDecayWithWarmup(optimizer, num_wramup_steps, total_steps):
+    schedule = partial(
+        _cosine_decay_warmup,
+        warmup_iterations=num_wramup_steps,
+        total_iterations=total_steps,
+    )
+    return lr_scheduler.LambdaLR(optimizer, schedule)
