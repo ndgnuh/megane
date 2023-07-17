@@ -133,6 +133,7 @@ class Trainer:
             self.optimizer,
             total_steps=train_config.total_steps,
             num_wramup_steps=30,
+            min_pct=0.1,
         )
 
         # Dataloader
@@ -382,7 +383,7 @@ class Trainer:
         self.logger.add_text(tag, f"```\n{txt}\n```", step)
 
 
-def _cosine_decay_warmup(iteration, warmup_iterations, total_iterations):
+def _cosine_decay_warmup(iteration, warmup_iterations, total_iterations, min_pct):
     """
     Linear warmup from 0 --> 1.0, then decay using cosine decay to 0.0
     """
@@ -392,14 +393,16 @@ def _cosine_decay_warmup(iteration, warmup_iterations, total_iterations):
         multiplier = (iteration - warmup_iterations) / (
             total_iterations - warmup_iterations
         )
+        multiplier = multiplier * (1 - min_pct)
         multiplier = 0.5 * (1 + math.cos(math.pi * multiplier))
     return multiplier
 
 
-def ConsineDecayWithWarmup(optimizer, num_wramup_steps, total_steps):
+def ConsineDecayWithWarmup(optimizer, num_wramup_steps, total_steps, min_pct):
     schedule = partial(
         _cosine_decay_warmup,
         warmup_iterations=num_wramup_steps,
         total_iterations=total_steps,
+        min_pct=min_pct,
     )
     return lr_scheduler.LambdaLR(optimizer, schedule)
