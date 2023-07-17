@@ -149,9 +149,9 @@ class Trainer:
         def make_loader(data, augment: bool, **kwargs):
             # Transform function
             def transform(sample):
-                sample = self.preprocess(sample)
                 if augment:
                     sample = augmentation(sample)
+                sample = self.preprocess(sample)
                 enc = self.encode(sample)
                 return enc
 
@@ -164,7 +164,6 @@ class Trainer:
                 data,
                 **dataloader_config,
                 **kwargs,
-                collate_fn=self.model.collate_fn,
             )
             return loader
 
