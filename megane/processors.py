@@ -32,7 +32,7 @@ from megane.utils import init_from_ns
 @dataclass
 class Letterbox:
     image_size: Tuple[int, int]
-    fill_value: Tuple[int, int, int]
+    fill_value: Tuple[int, int, int] = (127, 127, 127)
 
     def __call__(self, sample: Sample) -> Sample:
         # Unpack data
