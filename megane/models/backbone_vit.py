@@ -23,7 +23,10 @@ class SeparableSelfAttention(nn.Module):
 
 def Stem(hidden_size: int):
     return nn.Sequential(
-        nn.Conv2d(3, hidden_size, 7, stride=2, padding=3, bias=False),
+        nn.Conv2d(3, hidden_size, 3, stride=2, padding=1, bias=False),
+        nn.BatchNorm2d(hidden_size),
+        nn.ReLU(),
+        nn.Conv2d(hidden_size, hidden_size, 3, stride=2, padding=1, bias=False),
         nn.BatchNorm2d(hidden_size),
         nn.ReLU(),
     )
@@ -64,14 +67,6 @@ class Stage(nn.Module):
         super().__init__()
         blocks = [Block(input_size) for _ in range(num_layers)]
         self.blocks = nn.Sequential(*blocks)
-        self.downscale = nn.Conv2d(
-            input_size,
-            output_size,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            bias=False,
-        )
 
     def forward(self, x):
         n, c, h, w = x.shape
@@ -88,24 +83,41 @@ class Stage(nn.Module):
         # x: n (h w) c -> n c h w
         x = x.permute(0, 2, 1)
         x = x.reshape(n, c, h, w)
-
-        # Down sample
-        x = self.downscale(x)
         return x
 
 
 class MobileViT(nn.Sequential):
     def __init__(self, hidden_sizes, num_layers):
         super().__init__()
+
+        # Stem layer w / 4 h / 4 layer
         self.stem = Stem(hidden_sizes[0])
 
         count = 0
         for item in zip(hidden_sizes, hidden_sizes[1:], num_layers):
+            # Stage
             input_size, output_size, num_layer = item
             stage = Stage(input_size, output_size, num_layer)
-
             stage_name = f"stage_{count}"
             setattr(self, stage_name, stage)
+
+            # Down sample projection layer
+            # feature map size: w / 2^(count + 1) / 4
+            layer = nn.Sequential(
+                nn.Conv2d(
+                    input_size,
+                    output_size,
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    bias=False,
+                ),
+                nn.InstanceNorm2d(output_size),
+                nn.ReLU(),
+            )
+            setattr(self, f"project_{count}", layer)
+
+            # Increate count
             count = count + 1
 
 

@@ -155,12 +155,12 @@ def fpn_tinyresnet50(out_channels):
 @backbones.register()
 def fpn_mobilevit18(out_channels):
     net = mobilevit18()
-    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    model = FeaturePyramidNetwork(net, [1, 3, 5, 7], out_channels)
     return model
 
 
 @backbones.register()
 def fpn_mobilevit50(out_channels):
     net = mobilevit50()
-    model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    model = FeaturePyramidNetwork(net, [1, 3, 5, 7], out_channels)
     return model
