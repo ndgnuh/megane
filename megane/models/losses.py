@@ -102,4 +102,4 @@ def dice_loss(pr, gt, reduction="mean"):
 
 
 def lc_dice_loss(pr, gt, reduction="mean"):
-    torch.log(torch.cosh(dice_loss(pr, gt, reduction)))
+    return torch.log(torch.cosh(dice_loss(pr, gt, reduction)))
