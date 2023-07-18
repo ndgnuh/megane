@@ -118,6 +118,8 @@ class TrainConfig(BaseModel):
     print_every: int
     validate_every: int
 
+    lr_scheduler: Dict = Field(default=dict(type="cosine"))
+
     augment: AugmentConfig
     dataloader: Dict = Field(default_factory=dict)
     fabric: Dict = Field(default_factory=default_fabric_config)

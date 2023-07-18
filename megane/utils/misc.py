@@ -88,7 +88,7 @@ def save_args():
         setattr(self, k, v)
 
 
-def init_from_ns(ns, config: Dict):
+def init_from_ns(ns, config: Dict, **extra_options):
     """Helper function that takes a namespace and a dictionary
     to initialize an instance.
 
@@ -108,4 +108,4 @@ def init_from_ns(ns, config: Dict):
     """
     config = copy(config)
     kind = config.pop("type")
-    return getattr(ns, kind)(**config)
+    return getattr(ns, kind)(**config, **extra_options)

@@ -20,6 +20,7 @@ from megane.models import Model, ModelAPI
 from megane.utils import compute_maf1, TimeoutException, time_limit, init_from_ns
 from megane import registry
 from megane.processors import get_processor
+from megane.lr_scheduler import lr_schedulers
 
 
 def generate_fgsm_example(model, images, targets):
@@ -128,12 +129,16 @@ class Trainer:
 
         # Model & optimization
         # self.model.load_state_dict(torch.load("best-model.pt", map_location='cpu'))
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
-        self.lr_scheduler = ConsineDecayWithWarmup(
-            self.optimizer,
-            total_steps=train_config.total_steps,
-            num_wramup_steps=30,
-            min_pct=0.1,
+        self.optimizer = optim.AdamW(
+            self.model.parameters(),
+            lr=lr,
+            weight_decay=0.0001,
+        )
+        self.lr_scheduler = init_from_ns(
+            lr_schedulers,
+            train_config.lr_scheduler,
+            optimizer=self.optimizer,
+            total_steps=total_steps,
         )
 
         # Dataloader
@@ -380,40 +385,3 @@ class Trainer:
 
     def log_text(self, tag, txt, step):
         self.logger.add_text(tag, f"```\n{txt}\n```", step)
-
-
-def _cosine_decay_warmup(iteration, warmup_iterations, total_iterations, min_pct):
-    """
-    Linear warmup from 0 --> 1.0, then decay using cosine decay to 0.0
-    """
-    if iteration <= warmup_iterations:
-        multiplier = iteration / warmup_iterations
-    else:
-        multiplier = (iteration - warmup_iterations) / (
-            total_iterations - warmup_iterations
-        )
-        multiplier = multiplier * (1 - min_pct)
-        multiplier = 0.5 * (1 + math.cos(math.pi * multiplier))
-    return multiplier
-
-
-def _dbnet_schedule(step, total_steps, power, warmup=0):
-    if step < warmup:
-        return step / warmup
-    else:
-        return (1 - (step - warmup) / (total_steps - warmup)) ** power
-
-
-def DBNetScheduler(optimizer, total_steps, power: float = 0.9, warmup=0):
-    lambda_lr = partial(total_steps=total_steps, power=power, warmup=warmup)
-    return lr_scheduler.LambdaLR(optimizer, lambda_lr)
-
-
-def ConsineDecayWithWarmup(optimizer, num_wramup_steps, total_steps, min_pct):
-    schedule = partial(
-        _cosine_decay_warmup,
-        warmup_iterations=num_wramup_steps,
-        total_iterations=total_steps,
-        min_pct=min_pct,
-    )
-    return lr_scheduler.LambdaLR(optimizer, schedule)
