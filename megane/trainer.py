@@ -397,6 +397,18 @@ def _cosine_decay_warmup(iteration, warmup_iterations, total_iterations, min_pct
     return multiplier
 
 
+def _dbnet_schedule(step, total_steps, power, warmup=0):
+    if step < warmup:
+        return step / warmup
+    else:
+        return (1 - (step - warmup) / (total_steps - warmup)) ** power
+
+
+def DBNetScheduler(optimizer, total_steps, power: float = 0.9, warmup=0):
+    lambda_lr = partial(total_steps=total_steps, power=power, warmup=warmup)
+    return lr_scheduler.LambdaLR(optimizer, lambda_lr)
+
+
 def ConsineDecayWithWarmup(optimizer, num_wramup_steps, total_steps, min_pct):
     schedule = partial(
         _cosine_decay_warmup,
