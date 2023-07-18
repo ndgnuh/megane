@@ -5,7 +5,7 @@ from torch import nn
 from torchvision import models
 
 from megane.registry import backbones
-from megane.models.backbone_vit import mobilevit18, mobilevit50
+from megane.models.backbone_vit import mobilevit11, mobilevit18, mobilevit50
 from megane.models.backbone_resnet import (
     resnet18,
     resnet34,
@@ -149,6 +149,13 @@ def fpn_tinyresnet26(out_channels):
 def fpn_tinyresnet50(out_channels):
     net = tinyresnet50()
     model = FeaturePyramidNetwork(net, [1, 2, 3, 4], out_channels)
+    return model
+
+
+@backbones.register()
+def fpn_mobilevit11(out_channels):
+    net = mobilevit11()
+    model = FeaturePyramidNetwork(net, [1, 3, 5, 7], out_channels)
     return model
 
 

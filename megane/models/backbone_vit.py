@@ -122,6 +122,13 @@ class MobileViT(nn.Sequential):
 
 
 @backbones.register()
+def mobilevit11():
+    hidden_sizes = [24, 48, 64, 96, 128]
+    num_layers = [2, 2, 2, 2]
+    return MobileViT(hidden_sizes, num_layers)
+
+
+@backbones.register()
 def mobilevit18():
     hidden_sizes = [32, 64, 128, 192, 192]
     num_layers = [4, 4, 4, 4]
