@@ -19,6 +19,7 @@ class Augmentation:
             prob=prob,
             background_images=background_images,
             domain_images=domain_images,
+            **other,
         )
         if len(background_images) > 0:
             self.custom_transform = CA.OneOf(

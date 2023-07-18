@@ -1,4 +1,5 @@
 from itertools import product
+from typing import List
 
 import albumentations as A
 import cv2
@@ -111,7 +112,13 @@ def decode(outputs):
     )
 
 
-def default_transform(prob, background_images, domain_images):
+def default_transform(
+    prob,
+    rotate: bool = False,
+    flip: bool = False,
+    background_images: List[str] = [],
+    domain_images: List[str] = [],
+):
     transformations = [
         # Shader based
         A.OneOf([FakeLight()], p=prob),
@@ -168,17 +175,22 @@ def default_transform(prob, background_images, domain_images):
             ],
             p=prob,
         ),
+    ]
+    if flip:
         # group: Flipping around
-        A.OneOf(
+        flip_transform = A.OneOf(
             [
                 A.RandomRotate90(p=prob),
                 A.VerticalFlip(p=prob),
                 A.HorizontalFlip(p=prob),
             ],
             p=prob,
-        ),
+        )
+        transformations.append(flip_transform)
         # group: Geometric transform
-        A.OneOf(
+
+    if rotate:
+        rotate_transform = A.OneOf(
             [
                 *[
                     A.Perspective(fit_output=True, pad_val=(r, g, b))
@@ -197,8 +209,8 @@ def default_transform(prob, background_images, domain_images):
                 ],
             ],
             p=prob,
-        ),
-    ]
+        )
+        transformations.append(rotate_transform)
 
     if len(domain_images) > 0:
         domain_transforms = A.OneOf(
