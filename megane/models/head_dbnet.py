@@ -7,6 +7,7 @@ import torch
 import simpoly
 from typing import Optional
 from functools import cached_property
+from math import sqrt
 
 from torch import nn
 from torch.nn import functional as F
@@ -16,10 +17,64 @@ from lenses import bind
 from megane import utils
 from megane.data import Sample
 from megane.models.api import ModelAPI
+from megane.models.head_rrm import HeadWithRRM, ResidualRefinementModule
+from megane.models import losses as L
 from megane.debug import with_timer
 
 
 from megane.registry import heads, target_decoders, target_encoders
+
+
+def offset(poly, offset):
+    scale = 1000
+    n = len(poly)
+    offset = offset * scale
+    offset_lines = []
+    new_poly = []
+
+    total = n
+    for i in range(n):
+        # Line endpoints
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i + 1) % n]
+        if x1 == x2 and y1 == y2:
+            total = total - 1
+            continue
+
+        # Rescale for accuracy
+        x1 = x1 * scale
+        x2 = x2 * scale
+        y1 = y1 * scale
+        y2 = y2 * scale
+
+        # Calculate the direction vector & normal vector
+        vx, vy = x2 - x1, y2 - y1
+        vx, vy = vy, -vx
+
+        # normalize the normal vector
+        length = sqrt(vx**2 + vy**2)
+        vx, vy = vx / length, vy / length
+
+        # Offset endpoints -> offset lines
+        x1 = x1 - vx * offset
+        y1 = y1 - vy * offset
+        x2 = x2 - vx * offset
+        y2 = y2 - vy * offset
+        offset_lines.append((x1, y1, x2, y2))
+
+    # Find intersections
+    # New poly vertices are the intersection of the offset lines
+    # https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+    n = total
+    for i in range(n):
+        (x1, y1, x2, y2) = offset_lines[i]
+        (x3, y3, x4, y4) = offset_lines[(i + 1) % n]
+        deno = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4) + 1e-6
+        x = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - x4 * y3)) / deno
+        y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - x4 * y3)) / deno
+        new_poly.append((x / scale, y / scale))
+
+    return new_poly
 
 
 @target_encoders.register("dbnet")
@@ -116,10 +171,10 @@ def encode_dbnet(
             d = fixed_dist
 
         if shrink:
-            sbox = np.array(simpoly.offset(box, d), dtype=int)
+            sbox = np.array(offset(box, d), dtype=int)
         else:
             sbox = np.array(box, dtype=int)
-        ebox = np.clip(simpoly.offset(box, -d), 0, np.inf).astype(int)
+        ebox = np.clip(offset(box, -d), 0, np.inf).astype(int)
 
         # Draw probability map
         cv2.fillConvexPoly(proba_maps[cls], sbox, 1)
@@ -238,7 +293,7 @@ def with_background(x, dim=-3, logit=False):
 
 
 class PredictionConv(nn.Module):
-    def __init__(self, hidden_size: int, num_classes: int):
+    def __init__(self, hidden_size: int, num_classes: int, refine: str = None):
         super().__init__()
         aux_size = hidden_size // 4
         self.conv_1 = nn.Sequential(
@@ -263,6 +318,15 @@ class PredictionConv(nn.Module):
             kernel_size=2,
             stride=2,
         )
+        if refine == "rrm":
+            self.refine = ResidualRefinementModule(num_classes)
+        elif refine == "fast":
+            self.refine = nn.Sequential(
+                nn.Conv2d(num_classes, num_classes, 21, padding=21 // 2),
+                nn.ReLU(),
+            )
+        else:
+            self.refine = None
 
         # self.proj = nn.Conv2d(hidden_size, aux_size, 1)
         # self.up = nn.Upsample(scale_factor=2)
@@ -271,6 +335,8 @@ class PredictionConv(nn.Module):
         x = self.conv_1(x)
         x = self.conv_2(x)
         x = self.conv_3(x)
+        if self.refine is not None:
+            x = self.refine(x) + x
         return x
 
 
@@ -285,14 +351,15 @@ class DBNet(ModelAPI):
         shrink: bool = True,
         resize_mode: str = "resize",
         fixed_dist: float = None,
+        refine: str = None,
     ):
         super().__init__()
         utils.save_args()
 
         # 0 = background
-        self.probas = PredictionConv(hidden_size, num_classes)
+        self.probas = PredictionConv(hidden_size, num_classes, refine=refine)
         # 0 = threshold
-        self.thresholds = PredictionConv(hidden_size, num_classes)
+        self.thresholds = PredictionConv(hidden_size, num_classes, refine=refine)
 
     def forward(self, features, targets=None):
         probas = self.probas(features)
@@ -313,19 +380,9 @@ class DBNet(ModelAPI):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
 
-        def dice_loss(pr, gt, reduction="mean"):
-            pr = torch.sigmoid(pr)
-            losses = 1 - (pr * gt * 2 + 1) / (pr + gt + 1)
-            if reduction == "mean":
-                return losses.mean()
-            elif reduction == "none":
-                return losses
-            else:
-                raise NotImplementedError(f"Unknown reduction {reduction}")
-
         loss = 0
         count = 0
-        loss_fn = dice_loss
+        loss_fn = L.combo_ssim_loss_with_logits
         for i in range(self.num_classes):
             # Prepare
             pr_proba = pr_probas[:, i]
@@ -358,7 +415,7 @@ class DBNet(ModelAPI):
             if torch.count_nonzero(training_mask) > 0:
                 pr = pr_bin[training_mask]
                 gt = gt_bin[training_mask]
-                loss += loss_fn(pr, gt)
+                loss += L.dice_ssim_loss_with_logits(pr, gt)
                 # loss += torch.abs(pr_bin[~training_mask] - 0.5).mean()
                 # loss += torch.abs(pr_probas[~training_mask]).mean()
 
@@ -367,7 +424,7 @@ class DBNet(ModelAPI):
             # gt = with_background(gt_proba.unsqueeze(1))
             pr = pr_proba
             gt = gt_proba
-            loss += dice_loss(pr, gt)
+            loss += L.dice_ssim_loss_with_logits(pr, gt)
             # losses = loss_fn(pr, gt, reduction="none")
             # loss += loss_mining(losses, proba_mask)
 
@@ -376,7 +433,7 @@ class DBNet(ModelAPI):
             # gt = with_background(gt_threshold.unsqueeze(1))
             pr = pr_threshold
             gt = gt_threshold
-            losses = F.l1_loss(torch.sigmoid(pr), gt, reduction="mean")
+            losses = F.l1_loss(torch.sigmoid(pr), gt)
             loss += losses * 10
             # loss += loss_mining(losses, threshold_mask) * 10
             # loss += F.l1_loss(torch.sigmoid(pr), gt, reduction="mean") * 10
