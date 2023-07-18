@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 
 class Contour(nn.Module):
@@ -90,8 +91,9 @@ class LogCoshDiceLoss(nn.Module):
         return torch.log(torch.cosh(dice))
 
 
-def dice_loss(pr, gt, reduction="mean"):
-    pr = torch.sigmoid(pr)
+def dice_loss(pr, gt, reduction="mean", logit=True):
+    if logit:
+        pr = torch.sigmoid(pr)
     losses = 1 - (pr * gt * 2 + 1) / (pr + gt + 1)
     if reduction == "mean":
         return losses.mean()
@@ -101,5 +103,67 @@ def dice_loss(pr, gt, reduction="mean"):
         raise NotImplementedError(f"Unknown reduction {reduction}")
 
 
-def lc_dice_loss(pr, gt, reduction="mean"):
-    return torch.log(torch.cosh(dice_loss(pr, gt, reduction)))
+def lc_dice_loss(pr, gt, reduction="mean", logit=True):
+    return torch.log(torch.cosh(dice_loss(pr, gt, reduction, logit)))
+
+
+def dice_ssim_loss(pr, gt, reduction="mean", logit=True):
+    if logit:
+        pr = torch.sigmoid(pr)
+    d_loss = dice_loss(pr, gt, reduction, logit=False)
+    s_loss = ssim_loss(pr, gt, reduction)
+    return d_loss + s_loss
+
+
+def ssim_loss_with_logits(pr, gt, reduction="mean", c=1):
+    return ssim_loss(torch.sigmoid(pr), gt, reduction, c=c)
+
+
+def dice_ssim_loss_with_logits(pr, gt, reduction="mean", c=1):
+    lpr = torch.sigmoid(pr)
+    ssim = ssim_loss(lpr, gt, reduction, c=c)
+    dice = dice_loss(lpr, gt, reduction, logit=False)
+    return ssim + dice
+
+
+def combo_ssim_loss_with_logits(pr, gt, reduction="mean", c=1):
+    lpr = torch.sigmoid(pr)
+    ssim = ssim_loss(lpr, gt, reduction, c=c)
+    bce = F.binary_cross_entropy_with_logits(pr, gt, reduction=reduction)
+    dice = dice_loss(lpr, gt, reduction, logit=False)
+    l1 = F.l1_loss(lpr, gt)
+    return ssim + dice + bce + l1
+
+
+def ssim_loss(pr, gt, reduction="mean", c=1):
+    if pr.ndim > 2:
+        return sum(ssim_loss(pr_i, gt_i, c=c) for pr_i, gt_i in zip(pr, gt))
+
+    # Statistics
+    s_pr, m_pr = torch.std_mean(pr)
+    s_gt, m_gt = torch.std_mean(gt)
+    s_pr_gt = torch.mean((pr - m_pr) * (gt - m_gt))
+
+    # Auxiliary computations
+    m_pr_2 = torch.pow(m_pr, 2)
+    s_pr_2 = torch.pow(s_pr, 2)
+    m_gt_2 = torch.pow(m_gt, 2)
+    s_gt_2 = torch.pow(s_gt, 2)
+
+    # Image similarity
+    c1 = c2 = c3 = c
+    l = (2 * m_pr * m_gt + c1) / (m_pr_2 + m_gt_2 + c1)
+    c = (2 * s_pr * s_gt + c2) / (s_pr_2 + s_gt_2 + c2)
+    s = (s_pr_gt + c3) / (s_pr_2 + s_gt_2 + c3)
+    ssim = 1 - l * s * c
+
+    # Reduction
+    if reduction == "mean":
+        ssim = ssim.mean()
+    elif reduction == "sum":
+        ssim = ssim.sum()
+    elif reduction == "none":
+        pass
+    else:
+        raise NotImplementedError(f"Unsupported reduction {reduction}")
+    return ssim
