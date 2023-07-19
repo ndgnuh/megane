@@ -385,3 +385,30 @@ class Trainer:
 
     def log_text(self, tag, txt, step):
         self.logger.add_text(tag, f"```\n{txt}\n```", step)
+
+    def build_lmds(self, train_path: str, val_path: str = None):
+        from lmds import GeneratorModule, create_lmds
+        import pickle
+
+        def generator(ds):
+            for image, target in ds:
+                yield pickle.dumps((image, target))
+
+        dataset = self.train_loader.dataset
+        gm = GeneratorModule(
+            train_path,
+            generator(dataset),
+            total=len(self.train_loader),
+        )
+        create_lmds(gm)
+
+        # Validate dataset
+        if val_path is None:
+            return
+        dataset = self.val_loader.dataset
+        gm = GeneratorModule(
+            train_path,
+            generator(dataset),
+            total=len(self.train_loader),
+        )
+        create_lmds(gm)
