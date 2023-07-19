@@ -393,15 +393,15 @@ class DBNet(ModelAPI):
             # Training mask is needed because the surrounding will be 0.5
             pr_bin = self.db(pr_proba, pr_threshold, logits=True)
             gt_bin = self.db(gt_proba, gt_threshold, logits=True)
-            training_mask = (gt_proba + gt_threshold) > 0
-            if torch.count_nonzero(training_mask) > 0:
-                pr = pr_bin[training_mask]
-                gt = gt_bin[training_mask]
-                loss += L.dice_ssim_loss(pr, gt)
+            training_mask = (gt_proba + gt_threshold) < 0
+            gt_bin[training_mask] = 0
+            pr = pr_bin.unsqueeze(0)
+            gt = gt_bin.unsqueeze(0)
+            loss += L.dice_ssim_loss(pr, gt)
 
             # Proba map loss
-            pr = torch.sigmoid(pr_proba)
-            gt = gt_proba
+            pr = torch.sigmoid(pr_proba).unsqueeze(0)
+            gt = gt_proba.unsqueeze(0)
             loss += L.dice_ssim_loss(pr, gt)
 
             # Threshold map loss

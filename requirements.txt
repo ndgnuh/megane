@@ -13,3 +13,4 @@ onnx
 lenses
 git+https://github.com/ndgnuh/lmds
 simpoly
+pytorch_msssim
