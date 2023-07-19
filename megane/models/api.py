@@ -11,16 +11,6 @@ T = TypeVar("T")
 
 class ModelAPI(nn.Module, ABC):
     @abstractmethod
-    def encode_sample(self, sample: Sample) -> T:
-        ...
-
-    @abstractmethod
-    def decode_sample(
-        self, inputs: Tensor, outputs: Tensor, ground_truth: bool = False
-    ) -> Sample:
-        ...
-
-    @abstractmethod
     def compute_loss(self, outputs, targets) -> Tensor:
         ...
 
@@ -34,6 +24,3 @@ class ModelAPI(nn.Module, ABC):
         grouth_truth: bool = False,
     ) -> Tensor:
         ...
-
-    def collate_fn(self, samples):
-        return default_collate(samples)

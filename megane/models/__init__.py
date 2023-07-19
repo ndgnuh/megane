@@ -28,7 +28,6 @@ class Model(nn.Module):
 
         # Delegation
         self.compute_loss = self.head.compute_loss
-        self.collate_fn = self.head.collate_fn
         self.visualize_outputs = self.head.visualize_outputs
         self.set_infer(False)
 
