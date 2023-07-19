@@ -382,61 +382,33 @@ class DBNet(ModelAPI):
 
         loss = 0
         count = 0
-        loss_fn = L.combo_ssim_loss_with_logits
         for i in range(self.num_classes):
             # Prepare
             pr_proba = pr_probas[:, i]
             pr_threshold = pr_thresholds[:, i]
             gt_proba = gt_probas[:, i]
             gt_threshold = gt_thresholds[:, i]
-
-            # Training mask
-            # proba_mask = (torch.sigmoid(pr_proba * 50) > 0.5) & (gt_proba > 0.2)
-            # threshold_mask = (torch.sigmoid(pr_threshold * 50) > 0.5) & (
-            #     gt_threshold > 0.2
-            # )
-
-            # Full classification loss
-            # pr = with_background(
-            #     torch.stack([pr_proba, pr_threshold], dim=1),
-            #     logit=True,
-            # )
-            # gt = with_background(
-            #     torch.stack([gt_proba, gt_threshold], dim=1),
-            #     logit=False,
-            # )
-            # loss += F.cross_entropy(pr, gt)
-
             # DB map loss
+
             # Training mask is needed because the surrounding will be 0.5
-            pr_bin = self.db(pr_proba, pr_threshold, logits=False)
+            pr_bin = self.db(pr_proba, pr_threshold, logits=True)
             gt_bin = self.db(gt_proba, gt_threshold, logits=True)
             training_mask = (gt_proba + gt_threshold) > 0
             if torch.count_nonzero(training_mask) > 0:
                 pr = pr_bin[training_mask]
                 gt = gt_bin[training_mask]
-                loss += L.dice_ssim_loss_with_logits(pr, gt)
-                # loss += torch.abs(pr_bin[~training_mask] - 0.5).mean()
-                # loss += torch.abs(pr_probas[~training_mask]).mean()
+                loss += L.dice_ssim_loss(pr, gt)
 
             # Proba map loss
-            # pr = with_background(pr_proba.unsqueeze(1), logit=True)
-            # gt = with_background(gt_proba.unsqueeze(1))
-            pr = pr_proba
+            pr = torch.sigmoid(pr_proba)
             gt = gt_proba
-            loss += L.dice_ssim_loss_with_logits(pr, gt)
-            # losses = loss_fn(pr, gt, reduction="none")
-            # loss += loss_mining(losses, proba_mask)
+            loss += L.dice_ssim_loss(pr, gt)
 
             # Threshold map loss
-            # pr = with_background(pr_threshold.unsqueeze(1), logit=True)
-            # gt = with_background(gt_threshold.unsqueeze(1))
             pr = pr_threshold
             gt = gt_threshold
             losses = F.l1_loss(torch.sigmoid(pr), gt)
             loss += losses * 10
-            # loss += loss_mining(losses, threshold_mask) * 10
-            # loss += F.l1_loss(torch.sigmoid(pr), gt, reduction="mean") * 10
 
             count = count + 1
 

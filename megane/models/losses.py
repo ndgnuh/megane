@@ -91,9 +91,7 @@ class LogCoshDiceLoss(nn.Module):
         return torch.log(torch.cosh(dice))
 
 
-def dice_loss(pr, gt, reduction="mean", logit=True):
-    if logit:
-        pr = torch.sigmoid(pr)
+def dice_loss(pr, gt, reduction="mean"):
     losses = 1 - (pr * gt * 2 + 1) / (pr + gt + 1)
     if reduction == "mean":
         return losses.mean()
@@ -103,43 +101,20 @@ def dice_loss(pr, gt, reduction="mean", logit=True):
         raise NotImplementedError(f"Unknown reduction {reduction}")
 
 
+def bce_dice_loss(pr, gt, reduction="mean"):
+    bce = F.binary_cross_entropy(pr, gt, reduction=reduction)
+    dice = dice_loss(pr, gt, reduction)
+    return (bce + dice) * 0.5
+
+
 def lc_dice_loss(pr, gt, reduction="mean", logit=True):
     return torch.log(torch.cosh(dice_loss(pr, gt, reduction, logit)))
 
 
-def dice_ssim_loss(pr, gt, reduction="mean", logit=True):
-    if logit:
-        pr = torch.sigmoid(pr)
-    d_loss = dice_loss(pr, gt, reduction, logit=False)
-    s_loss = ssim_loss(pr, gt, reduction)
-    return d_loss + s_loss
-
-
-def ssim_loss_with_logits(pr, gt, reduction="mean", c=1e-6):
-    return ssim_loss(torch.sigmoid(pr), gt, reduction, c=c)
-
-
-def dice_ssim_loss_with_logits(pr, gt, reduction="mean", c=1e-6):
-    lpr = torch.sigmoid(pr)
-    ssim = ssim_loss(lpr, gt, reduction, c=c)
-    dice = dice_loss(lpr, gt, reduction, logit=False)
-    return ssim + dice
-
-
-def l1_ssim_loss_with_logits(pr, gt, reduction="mean", c=1e-6):
-    lpr = torch.sigmoid(pr)
-    ssim = ssim_loss(lpr, gt, reduction, c=c)
-    l1 = F.l1_loss(lpr, gt)
-    return ssim + l1
-
-
-def combo_ssim_loss_with_logits(pr, gt, reduction="mean", c=1e-6):
-    lpr = torch.sigmoid(pr)
-    ssim = ssim_loss(lpr, gt, reduction, c=c)
-    bce = F.binary_cross_entropy_with_logits(pr, gt, reduction=reduction)
-    dice = dice_loss(lpr, gt, reduction, logit=False)
-    l1 = F.l1_loss(lpr, gt)
-    return ssim + dice + bce + l1
+def dice_ssim_loss(pr, gt, reduction="mean", c=1e-6):
+    dice = dice_loss(pr, gt, reduction)
+    ssim = ssim_loss(pr, gt, reduction, c)
+    return (dice + ssim) * 0.5
 
 
 def ssim_loss(pr, gt, reduction="mean", c=1e-6):
@@ -162,7 +137,7 @@ def ssim_loss(pr, gt, reduction="mean", c=1e-6):
     l = (2 * m_pr * m_gt + c1) / (m_pr_2 + m_gt_2 + c1)
     c = (2 * s_pr * s_gt + c2) / (s_pr_2 + s_gt_2 + c2)
     s = (s_pr_gt + c3) / (s_pr_2 + s_gt_2 + c3)
-    ssim = F.mse_loss(pr, gt) - l * s * c
+    ssim = 1 - l * s * c
 
     # Reduction
     if reduction == "mean":
