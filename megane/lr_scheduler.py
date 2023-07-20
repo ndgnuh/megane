@@ -49,3 +49,11 @@ def ConsineDecayWithWarmup(optimizer, total_steps, min_pct=0.05, num_warmup_step
         min_pct=min_pct,
     )
     return LambdaLR(optimizer, schedule)
+
+
+@lr_schedulers.register("none")
+def ConstLR(optimizer, *args, **kwargs):
+    def schedule(*args):
+        return 1
+
+    return LambdaLR(optimizer, schedule)
