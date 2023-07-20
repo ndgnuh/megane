@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from os import path
 
 import torch
+from torch import nn
 from torchvision.transforms import functional as TF
 from torch.onnx import export
 from PIL import Image
@@ -12,6 +13,7 @@ from megane import Model, MeganeConfig, Sample, init_model
 def main():
     parser = ArgumentParser()
     parser.add_argument("config")
+    parser.add_argument("--sigmoid", action="store_true", default=False)
     parser.add_argument("output", default=None)
 
     args = parser.parse_args()
@@ -35,9 +37,15 @@ def main():
     sample = processor(sample)
     inputs = TF.to_tensor(sample.image).unsqueeze(0)
 
+    # Append sigmoid at the end
+    if args.sigmoid:
+        model = nn.Sequential(model, nn.Sigmoid())
+
+    print(model(inputs))
+
     # Export
     export(
-        model,
+        (model),
         inputs,
         output_file,
         do_constant_folding=True,
