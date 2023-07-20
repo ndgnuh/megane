@@ -391,14 +391,16 @@ class Trainer:
         import pickle
 
         def generator(ds):
-            for image, target in ds:
+            print(len(ds))
+            for i in range(len(ds)):
+                image, target = ds[i]
                 yield pickle.dumps((image, target))
 
         dataset = self.train_loader.dataset
         gm = GeneratorModule(
             train_path,
             generator(dataset),
-            total=len(self.train_loader),
+            total=len(dataset),
         )
         create_lmds(gm)
 
@@ -409,6 +411,6 @@ class Trainer:
         gm = GeneratorModule(
             train_path,
             generator(dataset),
-            total=len(self.train_loader),
+            total=len(dataset),
         )
         create_lmds(gm)
