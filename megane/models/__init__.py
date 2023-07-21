@@ -8,8 +8,8 @@ from megane.models import (
     backbone_resnet,
     backbone_fpn,
     head_dbnet,
+    head_segm,
 )
-from megane.models.api import ModelAPI
 from megane.utils import init_from_ns
 from megane.registry import backbones, heads
 
