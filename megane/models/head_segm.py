@@ -86,6 +86,7 @@ class CLSMDecoder:
         if not ground_truth:
             if isinstance(outputs, (list, tuple)):
                 outputs = outputs[0]
+            outputs = torch.sigmoid(outputs)
 
         # Decode image
         image = TF.to_pil_image(inputs)
