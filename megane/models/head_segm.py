@@ -2,18 +2,15 @@ from dataclasses import dataclass
 from typing import List, Tuple
 
 import cv2
-import simpoly
 import torch
-from lenses import bind
-from torch import nn
+from torch import nn, Tensor
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
 
-from megane import registry, utils
+from megane import registry
 from megane.data import Sample
 from megane.models import losses as L
-from megane.models.head_rrm import HeadWithRRM, ResidualRefinementModule
-from megane.registry import heads, target_decoders, target_encoders
+from megane.models.head_rrm import ResidualRefinementModule
 
 
 @torch.jit.script
@@ -163,31 +160,58 @@ class ClassifierSegmenter(nn.Module):
         loss = p_losses.mean() + n_losses.mean()
         return loss
 
+    @torch.jit.script
+    def loss_reduce(
+        self,
+        losses: Tensor,
+        tp: Tensor,
+        tn: Tensor,
+        fp: Tensor,
+        fn: Tensor,
+    ):
+        weights = [1, 1, 3, 3]
+        masks = [tp, tn, fp, fn]
+        loss = torch.zeros(0, torch.float32)
+        total = 0
+        for i in range(4):
+            mask = masks[i]
+            weight = weights[i]
+            if torch.count_nonzero(mask) == 0:
+                continue
+            loss = loss + losses[mask]
+            total = total + weight
+
+        loss = loss / total
+        return loss
+
     def compute_loss(self, outputs, targets):
         refined, unrefined = outputs
         unrefined = torch.sigmoid(unrefined)
         refined = torch.sigmoid(refined)
-        positives = (torch.sigmoid(refined) > 0.75) == targets
-        # positives = targets > 0
-        # tp = (predicts == 1) & (targets == 1)
-        # fp = (predicts == 1) & (targets == 0)
-        # tn = (predicts == 0) & (targets == 0)
-        # fn = (predicts == 0) & (targets == 1)
-        # unsure = (refined <= 0.9) & (refined >= 0.1)
-        negatives = ~positives
-        n_pos = torch.count_nonzero(positives)
-        n_neg = min(torch.count_nonzero(negatives), n_pos * 3)
+
+        # positives and negatives
+        pr_pos = refined > 0.5
+        pr_neg = ~pr_pos
+        gt_pos = targets > 0
+        gt_neg = ~gt_pos
+
+        # Confusions
+        tp = pr_pos & gt_pos
+        fp = pr_pos & gt_neg
+        tn = pr_neg & gt_neg
+        fn = pr_neg & gt_pos
+        conf = (tp, tn, fp, fn)
 
         loss = 0
         bce = F.binary_cross_entropy_with_logits
         losses = bce(unrefined, targets, reduction="none")
-        loss += self.loss_sampling2(losses, positives, negatives, n_pos, n_neg)
+        loss += self.loss_reduce(losses, *conf)
         losses = bce(refined, targets, reduction="none")
-        loss += self.loss_sampling2(losses, positives, negatives, n_pos, n_neg)
+        loss += self.loss_reduce(losses, *conf)
         losses = L.dice_ssim_loss(refined, targets, reduction="none")
-        loss += self.loss_sampling2(losses, positives, negatives, n_pos, n_neg)
+        loss += self.loss_reduce(losses, *conf)
         losses = L.dice_ssim_loss(unrefined, targets, reduction="none")
-        loss += self.loss_sampling2(losses, positives, negatives, n_pos, n_neg)
+        loss += self.loss_reduce(losses, *conf)
         return loss / 4
 
     def visualize_outputs(self, outputs, logger, tag, step, ground_truth=False):
