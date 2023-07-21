@@ -162,7 +162,6 @@ class ClassifierSegmenter(nn.Module):
 
     @torch.jit.script
     def loss_reduce(
-        self,
         losses: Tensor,
         tp: Tensor,
         tn: Tensor,
@@ -171,14 +170,14 @@ class ClassifierSegmenter(nn.Module):
     ):
         weights = [1, 1, 3, 3]
         masks = [tp, tn, fp, fn]
-        loss = torch.zeros(0, torch.float32)
+        loss = torch.tensor(0.0, dtype=torch.float32, device=losses.device)
         total = 0
         for i in range(4):
             mask = masks[i]
             weight = weights[i]
             if torch.count_nonzero(mask) == 0:
                 continue
-            loss = loss + losses[mask]
+            loss = loss + losses[mask].mean()
             total = total + weight
 
         loss = loss / total
