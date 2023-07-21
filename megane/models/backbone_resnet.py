@@ -130,7 +130,7 @@ def resnet34():
 
 @backbones.register()
 def resnet50():
-    hidden_sizes = [64, 128, 256, 512, 2048]
+    hidden_sizes = [64, 128, 256, 512]
     num_layers = [3, 4, 6, 3]
     return ResNet(hidden_sizes, num_layers, BottleNeckBlock)
 
