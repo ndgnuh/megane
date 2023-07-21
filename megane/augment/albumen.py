@@ -116,12 +116,11 @@ def default_transform(
     prob,
     rotate: bool = False,
     flip: bool = False,
+    light_fx: bool = False,
     background_images: List[str] = [],
     domain_images: List[str] = [],
 ):
     transformations = [
-        # Shader based
-        A.OneOf([FakeLight()], p=prob),
         # Color effects
         A.OneOf(
             [
@@ -135,21 +134,6 @@ def default_transform(
                 A.ColorJitter(),
                 A.RandomGamma(),
                 A.RGBShift(),
-            ],
-            p=prob,
-        ),
-        # Lighting
-        A.OneOf(
-            [
-                A.RandomShadow(shadow_roi=(0, 0, 1, 1)),
-                A.RandomSunFlare(
-                    flare_roi=(0, 0, 1, 1),
-                    p=prob,
-                    src_radius=32,
-                    num_flare_circles_upper=20,
-                ),
-                BloomFilter(),
-                ChromaticAberration(),
             ],
             p=prob,
         ),
@@ -176,6 +160,27 @@ def default_transform(
             p=prob,
         ),
     ]
+
+    if light_fx:
+        # Lighting
+        transformations.append(A.OneOf([FakeLight()], p=prob))
+        transformations.append(
+            A.OneOf(
+                [
+                    A.RandomShadow(shadow_roi=(0, 0, 1, 1)),
+                    A.RandomSunFlare(
+                        flare_roi=(0, 0, 1, 1),
+                        p=prob,
+                        src_radius=32,
+                        num_flare_circles_upper=20,
+                    ),
+                    BloomFilter(),
+                    ChromaticAberration(),
+                ],
+                p=prob,
+            )
+        )
+
     if flip:
         # group: Flipping around
         flip_transform = A.OneOf(
