@@ -364,7 +364,7 @@ class DBNet(ModelAPI):
     def forward(self, features, targets=None):
         probas = self.probas(features)
         if self.infer:
-            thresholds = None
+            return probas
         else:
             thresholds = self.thresholds(features)
         return (probas, thresholds)
