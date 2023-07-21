@@ -16,7 +16,7 @@ from tqdm import tqdm
 from megane.augment import Augmentation
 from megane.configs import ModelConfig, TrainConfig, MeganeConfig
 from megane.data import get_dataset
-from megane.models import Model, ModelAPI
+from megane.models import Model
 from megane.utils import compute_maf1, TimeoutException, time_limit, init_from_ns
 from megane import registry
 from megane.processors import get_processor
