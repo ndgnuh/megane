@@ -121,6 +121,14 @@ def default_transform(
     domain_images: List[str] = [],
 ):
     transformations = [
+        # Cropping related
+        A.OneOf(
+            [
+                A.RandomCropFromBorders(),
+                A.CropAndPad(percent=(0.025, 0.25)),
+            ],
+            p=prob,
+        ),
         # Color effects
         A.OneOf(
             [
