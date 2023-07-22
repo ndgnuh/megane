@@ -83,7 +83,7 @@ class CLSMDecoder:
         if not ground_truth:
             if isinstance(outputs, (list, tuple)):
                 outputs = outputs[0]
-            outputs = torch.sigmoid(outputs)
+            # outputs = torch.sigmoid(outputs)
 
         # Decode image
         image = TF.to_pil_image(inputs)
@@ -112,9 +112,11 @@ class ClassifierSegmenter(nn.Module):
             nn.BatchNorm2d(in_channels // 4),
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels // 4, num_classes, 4, stride=4),
+            nn.Sigmoid(),
         )
         self.rrm = nn.Sequential(
             ResidualRefinementModule(num_classes),
+            nn.Sigmoid(),
         )
 
     def forward(self, x, *args, **kwargs):
@@ -185,37 +187,37 @@ class ClassifierSegmenter(nn.Module):
 
     def compute_loss(self, outputs, targets):
         refined, unrefined = outputs
-        unrefined = torch.sigmoid(unrefined)
-        refined = torch.sigmoid(refined)
 
-        # positives and negatives
-        pr_pos = refined > 0.5
-        pr_neg = ~pr_pos
-        gt_pos = targets > 0
-        gt_neg = ~gt_pos
+        # # positives and negatives
+        # pr_pos = refined > 0.5
+        # pr_neg = ~pr_pos
+        # gt_pos = targets > 0
+        # gt_neg = ~gt_pos
 
-        # Confusions
-        tp = pr_pos & gt_pos
-        fp = pr_pos & gt_neg
-        tn = pr_neg & gt_neg
-        fn = pr_neg & gt_pos
-        conf = (tp, tn, fp, fn)
+        # # Confusions
+        # tp = pr_pos & gt_pos
+        # fp = pr_pos & gt_neg
+        # tn = pr_neg & gt_neg
+        # fn = pr_neg & gt_pos
+        # conf = (tp, tn, fp, fn)
 
         loss = 0
-        bce = F.binary_cross_entropy_with_logits
-        losses = bce(unrefined, targets, reduction="none")
-        loss += self.loss_reduce(losses, *conf)
-        losses = bce(refined, targets, reduction="none")
-        loss += self.loss_reduce(losses, *conf)
-        losses = L.dice_ssim_loss(refined, targets, reduction="none")
-        loss += self.loss_reduce(losses, *conf)
-        losses = L.dice_ssim_loss(unrefined, targets, reduction="none")
-        loss += self.loss_reduce(losses, *conf)
-        return loss / 4
+        # bce = F.binary_cross_entropy
+        # pos = targets > 0
+        # neg = ~pos
+        # losses = bce(unrefined, targets, reduction="none")
+        # loss += losses[pos].mean() + losses[neg].mean()
+        # loss += self.loss_reduce(losses, *conf)
+        # losses = bce(refined, targets, reduction="none")
+        # loss += losses[pos].mean() + losses[neg].mean()
+        # loss += self.loss_reduce(losses, *conf)
+        loss += L.dice_ssim_loss(refined, targets, reduction="mean")
+        loss += L.dice_ssim_loss(unrefined, targets, reduction="mean")
+        return loss / 2
 
     def visualize_outputs(self, outputs, logger, tag, step, ground_truth=False):
         if not ground_truth:
-            outputs = torch.sigmoid(outputs[0])
+            outputs = outputs[0]
         outputs = torch.cat(list(outputs), dim=-2)
         outputs = torch.cat(list(outputs), dim=-1)
         outputs = outputs.unsqueeze(0)
