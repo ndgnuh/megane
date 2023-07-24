@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
+from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM, ssim
 
 
 class Contour(nn.Module):
@@ -117,6 +117,10 @@ def dice_ssim_loss(pr, gt, reduction="mean", c=1e-6):
     # ssim = ssim_loss(pr, gt, reduction, c)
     ssim = 1 - ms_ssim(pr, gt, data_range=1, size_average=True)
     return (dice + ssim) * 0.5
+
+
+def ms_ssim_loss(pr, gt, *args, **kwargs):
+    return 1 - ssim(pr, gt, data_range=1, size_average=True)
 
 
 def ssim_loss(pr, gt, reduction="mean", c=1e-6):
