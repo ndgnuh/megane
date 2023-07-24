@@ -83,7 +83,7 @@ class CLSMDecoder:
         if not ground_truth:
             if isinstance(outputs, (list, tuple)):
                 outputs = outputs[0]
-            # outputs = torch.sigmoid(outputs)
+            outputs = torch.sigmoid(outputs)
 
         # Decode image
         image = TF.to_pil_image(inputs)
@@ -112,113 +112,67 @@ class ClassifierSegmenter(nn.Module):
             nn.BatchNorm2d(in_channels // 4),
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels // 4, num_classes, 4, stride=4),
-            nn.Sigmoid(),
         )
-        self.rrm = nn.Sequential(
-            ResidualRefinementModule(num_classes),
-            nn.Sigmoid(),
+        self.conv_reflect = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels // 4, 3, padding=1),
+            nn.BatchNorm2d(in_channels // 4),
+            nn.ReLU(),
+            nn.ConvTranspose2d(in_channels // 4, num_classes, 4, stride=4),
         )
 
-    def forward(self, x, *args, **kwargs):
+    def forward(self, ft, *args, **kwargs):
+        x = ft
         x = self.conv_1(x)
-        prerefine = x
-        x = self.rrm(x)
         if self.infer:
-            return x
+            return torch.sigmoid(x)
         else:
-            return x, prerefine
-
-    def ms_ce(self, outputs: torch.Tensor, targets: torch.Tensor):
-        loss = F.cross_entropy(outputs, targets)
-        for scale in [0.5, 0.75, 1.5, 2]:
-            pr = F.interpolate(outputs, scale_factor=scale)
-            gt = F.interpolate(targets, scale_factor=scale)
-            loss = loss + F.cross_entropy(pr, gt)
-        return loss / 5
-
-    def loss_sampling(self, losses, masks, weights):
-        loss = 0
-        total = 0
-        for mask, weight in zip(masks, weights):
-            if torch.count_nonzero(mask) == 0:
-                continue
-            loss += losses[mask].mean() * weight
-            total += weight
-        loss = loss / total
-        return loss
-
-    def loss_sampling2(self, losses, positives, negatives=None, n_pos=None, n_neg=None):
-        if negatives is None:
-            negatives = ~positives
-        if n_pos is None:
-            n_pos = torch.count_nonzero(positives)
-        if n_neg is None:
-            n_neg = min(torch.count_nonzero(negatives), n_pos * 3)
-        if n_pos == 0 or n_neg == 0:
-            return losses.mean()
-
-        p_losses, _ = torch.topk(losses[positives], n_pos)
-        n_losses, _ = torch.topk(losses[negatives], n_neg)
-        loss = p_losses.mean() + n_losses.mean()
-        return loss
-
-    @torch.jit.script
-    def loss_reduce(
-        losses: Tensor,
-        tp: Tensor,
-        tn: Tensor,
-        fp: Tensor,
-        fn: Tensor,
-    ):
-        weights = [1, 1, 3, 3]
-        masks = [tp, tn, fp, fn]
-        loss = torch.tensor(0.0, dtype=torch.float32, device=losses.device)
-        total = 0
-        for i in range(4):
-            mask = masks[i]
-            weight = weights[i]
-            if torch.count_nonzero(mask) == 0:
-                continue
-            loss = loss + losses[mask].mean()
-            total = total + weight
-
-        loss = loss / total
-        return loss
+            reflect = self.conv_reflect(ft)
+            return x, reflect
 
     def compute_loss(self, outputs, targets):
-        refined, unrefined = outputs
+        probas, reflects = outputs
 
-        # # positives and negatives
-        # pr_pos = refined > 0.5
-        # pr_neg = ~pr_pos
-        # gt_pos = targets > 0
-        # gt_neg = ~gt_pos
-
-        # # Confusions
-        # tp = pr_pos & gt_pos
-        # fp = pr_pos & gt_neg
-        # tn = pr_neg & gt_neg
-        # fn = pr_neg & gt_pos
-        # conf = (tp, tn, fp, fn)
-
+        # Informations
         loss = 0
-        # bce = F.binary_cross_entropy
-        # pos = targets > 0
-        # neg = ~pos
-        # losses = bce(unrefined, targets, reduction="none")
-        # loss += losses[pos].mean() + losses[neg].mean()
-        # loss += self.loss_reduce(losses, *conf)
-        # losses = bce(refined, targets, reduction="none")
-        # loss += losses[pos].mean() + losses[neg].mean()
-        # loss += self.loss_reduce(losses, *conf)
-        loss += L.dice_ssim_loss(refined, targets, reduction="mean")
-        loss += L.dice_ssim_loss(unrefined, targets, reduction="mean")
-        return loss / 2
+        pos = (probas > 0.5) == (targets > 0)
+        neg = ~pos
+        gt_corrects = pos * 1.0
+        bce = F.binary_cross_entropy_with_logits
+        bsize = probas.shape[0]
+
+        # Reflection loss
+        losses = []
+        for i in range(bsize):
+            loss = 0
+
+            r_loss = 0
+            r_loss += bce(reflects[pos], gt_corrects[pos])
+            r_loss += bce(reflects[neg], gt_corrects[neg])
+            r_loss = r_loss / 2
+
+            # Mask loss
+            m_loss = 0
+            m_loss += bce(probas[pos], targets[pos])
+            m_loss += bce(probas[neg], targets[neg])
+            m_loss = m_loss / 2
+
+            # Total loss
+            loss = (m_loss + r_loss) / 2
+            losses.append(loss)
+
+        k = max(bsize // 2, 1)
+        losses = torch.topk(torch.stack(losses), k=k).values
+        loss = losses.mean()
+        return loss
 
     def visualize_outputs(self, outputs, logger, tag, step, ground_truth=False):
         if not ground_truth:
-            outputs = outputs[0]
-        outputs = torch.cat(list(outputs), dim=-2)
+            outputs = torch.sigmoid(outputs[0])
+        else:
+            ic(outputs.shape)
+
+        if outputs.ndim == 4:
+            outputs = torch.cat(list(outputs), dim=-2)
         outputs = torch.cat(list(outputs), dim=-1)
         outputs = outputs.unsqueeze(0)
         logger.add_image(tag, outputs, step)
