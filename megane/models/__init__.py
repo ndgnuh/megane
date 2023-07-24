@@ -9,6 +9,7 @@ from megane.models import (
     backbone_fpn,
     head_dbnet,
     head_segm,
+    tablenet,
 )
 from megane.utils import init_from_ns
 from megane.registry import backbones, heads
