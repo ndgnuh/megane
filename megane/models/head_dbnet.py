@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import torch
 import simpoly
-from typing import Optional
+from typing import Optional, Tuple, List
 from functools import cached_property
 from math import sqrt
 
@@ -181,17 +181,7 @@ def encode_dbnet(
 
         # Threshold map draw
         # Draw through a canvas
-        canvas = np.zeros((H, W), dtype="float32")
-        canvas = cv2.fillConvexPoly(canvas, ebox, 1)
-        canvas = cv2.fillConvexPoly(canvas, sbox, 0)
-        # dist = cv2.distanceTransform(canvas, cv2.DIST_L2, 3)
-        # cv2.normalize(
-        #     dist,
-        #     dist,
-        #     norm_type=cv2.NORM_MINMAX,
-        #     alpha=0,
-        #     beta=1,
-        # )
+        canvas = draw_threshold(W, H, box, sbox, ebox, d)
         threshold_maps[cls] = np.maximum(threshold_maps[cls], canvas)
 
     proba_maps = np.clip(proba_maps, 0, 1)
@@ -393,16 +383,15 @@ class DBNet(ModelAPI):
             # Training mask is needed because the surrounding will be 0.5
             pr_bin = self.db(pr_proba, pr_threshold, logits=True)
             gt_bin = self.db(gt_proba, gt_threshold, logits=True)
-            training_mask = (gt_proba + gt_threshold) < 0
-            gt_bin[training_mask] = 0
-            pr = pr_bin.unsqueeze(0)
-            gt = gt_bin.unsqueeze(0)
-            loss += L.dice_ssim_loss(pr, gt)
+            training_mask = (gt_proba + gt_threshold) > 0
+            pr = pr_bin[training_mask]
+            gt = gt_bin[training_mask]
+            loss += F.binary_cross_entropy_with_logits(pr, gt)
 
             # Proba map loss
             pr = torch.sigmoid(pr_proba).unsqueeze(0)
             gt = gt_proba.unsqueeze(0)
-            loss += L.dice_ssim_loss(pr, gt)
+            loss += F.binary_cross_entropy_with_logits(pr, gt)
 
             # Threshold map loss
             pr = pr_threshold
@@ -470,3 +459,46 @@ class DBNet(ModelAPI):
             scores=scores,
         )
         return sample
+
+
+def point_line_distance(
+    xy: Tuple[float, float], P1: Tuple[float, float], P2: Tuple[float, float]
+) -> float:
+    x0, y0 = xy
+    x1, y1 = P1
+    x2, y2 = P2
+    n = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1))
+    d = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+    return n / d
+
+
+def min_polygon_distance(
+    xy: Tuple[float, float], polygons: List[Tuple[float, float]], n: int
+) -> float:
+    min_d = 9999
+    for i in range(n):
+        P1 = polygons[i]
+        P2 = polygons[(i + 1) % n]
+        d = point_line_distance(xy, P1, P2)
+        min_d = min(d, min_d)
+    return min_d
+
+
+def draw_threshold(
+    W: int,
+    H: int,
+    polygon: List[Tuple[float, float]],
+    inner_polygon: List[Tuple[float, float]],
+    outer_polygon: List[Tuple[float, float]],
+    expand_dist: float,
+):
+    canvas = np.zeros((H, W), "float32")
+    cv2.fillConvexPoly(canvas, np.array(outer_polygon, int), 1)
+    cv2.fillConvexPoly(canvas, np.array(inner_polygon, int), 0)
+    I, J = np.where(canvas)
+    n = len(polygon)
+    for i, j in zip(I, J):
+        d = min_polygon_distance((j, i), polygon, n)
+        d = max(min(d / expand_dist, 1), 0)
+        canvas[i, j] = 1 - d
+    return canvas
