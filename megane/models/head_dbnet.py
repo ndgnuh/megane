@@ -25,58 +25,6 @@ from megane.debug import with_timer
 from megane.registry import heads, target_decoders, target_encoders
 
 
-def offset(poly, offset):
-    scale = 1000
-    n = len(poly)
-    offset = offset * scale
-    offset_lines = []
-    new_poly = []
-
-    total = n
-    for i in range(n):
-        # Line endpoints
-        x1, y1 = poly[i]
-        x2, y2 = poly[(i + 1) % n]
-        if x1 == x2 and y1 == y2:
-            total = total - 1
-            continue
-
-        # Rescale for accuracy
-        x1 = x1 * scale
-        x2 = x2 * scale
-        y1 = y1 * scale
-        y2 = y2 * scale
-
-        # Calculate the direction vector & normal vector
-        vx, vy = x2 - x1, y2 - y1
-        vx, vy = vy, -vx
-
-        # normalize the normal vector
-        length = sqrt(vx**2 + vy**2)
-        vx, vy = vx / length, vy / length
-
-        # Offset endpoints -> offset lines
-        x1 = x1 - vx * offset
-        y1 = y1 - vy * offset
-        x2 = x2 - vx * offset
-        y2 = y2 - vy * offset
-        offset_lines.append((x1, y1, x2, y2))
-
-    # Find intersections
-    # New poly vertices are the intersection of the offset lines
-    # https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
-    n = total
-    for i in range(n):
-        (x1, y1, x2, y2) = offset_lines[i]
-        (x3, y3, x4, y4) = offset_lines[(i + 1) % n]
-        deno = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4) + 1e-6
-        x = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - x4 * y3)) / deno
-        y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - x4 * y3)) / deno
-        new_poly.append((x / scale, y / scale))
-
-    return new_poly
-
-
 @target_encoders.register("dbnet")
 @dataclass
 class DBNetEncoder:
@@ -171,18 +119,17 @@ def encode_dbnet(
             d = fixed_dist
 
         if shrink:
-            sbox = np.array(offset(box, d), dtype=int)
+            sbox = np.array(simpoly.offset(box, d), dtype=int)
         else:
             sbox = np.array(box, dtype=int)
-        ebox = np.clip(offset(box, -d), 0, np.inf).astype(int)
+        ebox = simpoly.offset(box, -d)
 
         # Draw probability map
         cv2.fillConvexPoly(proba_maps[cls], sbox, 1)
 
         # Threshold map draw
         # Draw through a canvas
-        canvas = draw_threshold(W, H, box, sbox, ebox, d)
-        threshold_maps[cls] = np.maximum(threshold_maps[cls], canvas)
+        draw_threshold(threshold_maps[cls], box, ebox, d)
 
     proba_maps = np.clip(proba_maps, 0, 1)
     threshold_maps = np.clip(threshold_maps, 0, 1)
@@ -404,20 +351,6 @@ class DBNet(ModelAPI):
         loss = loss / count
         return loss
 
-    def encode_sample(self, sample: Sample):
-        sz = sample.image.size
-        num_classes = self.num_classes
-        shrink_rate = self.shrink_rate
-        image = TF.to_tensor(sample.image)
-        targets = encode_dbnet(
-            sample,
-            num_classes,
-            shrink_rate,
-            shrink=self.shrink,
-            fixed_dist=self.fixed_dist,
-        )
-        return image, targets
-
     def post_process(self, probas):
         return torch.sigmoid(probas)
 
@@ -438,67 +371,66 @@ class DBNet(ModelAPI):
         images = utils.stack_image_batch(images)
         logger.add_image(tag, images, step)
 
-    @torch.no_grad()
-    def decode_sample(self, inputs, outputs, ground_truth: bool = False):
-        # post process
-        outputs = outputs[0].detach().cpu()
-        if not ground_truth:
-            outputs = self.post_process(outputs)
-
-        image = TF.to_pil_image(inputs.detach().cpu())
-        boxes, classes, scores = decode_dbnet(
-            outputs.numpy(),
-            self.expand_rate,
-            self.shrink,
-            self.fixed_dist,
-        )
-        sample = Sample(
-            image=image,
-            boxes=boxes,
-            classes=classes,
-            scores=scores,
-        )
-        return sample
-
-
-def point_line_distance(
-    xy: Tuple[float, float], P1: Tuple[float, float], P2: Tuple[float, float]
-) -> float:
-    x0, y0 = xy
-    x1, y1 = P1
-    x2, y2 = P2
-    n = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1))
-    d = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-    return n / d
-
-
-def min_polygon_distance(
-    xy: Tuple[float, float], polygons: List[Tuple[float, float]], n: int
-) -> float:
-    min_d = 9999
-    for i in range(n):
-        P1 = polygons[i]
-        P2 = polygons[(i + 1) % n]
-        d = point_line_distance(xy, P1, P2)
-        min_d = min(d, min_d)
-    return min_d
-
 
 def draw_threshold(
-    W: int,
-    H: int,
+    canvas: np.ndarray,
     polygon: List[Tuple[float, float]],
-    inner_polygon: List[Tuple[float, float]],
     outer_polygon: List[Tuple[float, float]],
-    expand_dist: float,
+    distance: float,
 ):
-    canvas = np.zeros((H, W), "float32")
-    cv2.fillConvexPoly(canvas, np.array(outer_polygon, int), 1)
-    cv2.fillConvexPoly(canvas, np.array(inner_polygon, int), 0)
-    I, J = np.where(canvas)
+    H, W = canvas.shape
+
+    # Polygon bounding rects
+    xmin, ymin = np.min(outer_polygon, axis=0)
+    xmax, ymax = np.max(outer_polygon, axis=0)
+    xmin = max(0, int(round(xmin)))
+    xmax = min(W, int(round(xmax)))
+    ymin = max(0, int(round(ymin)))
+    ymax = min(H, int(round(ymax)))
+
+    # Draw threshold
+    xs = np.arange(xmin, xmax)
+    ys = np.arange(ymin, ymax)
+    distances = []
     n = len(polygon)
-    for i, j in zip(I, J):
-        d = min_polygon_distance((j, i), polygon, n)
-        d = max(min(d / expand_dist, 1), 0)
-        canvas[i, j] = 1 - d
+    for i in range(n):
+        xa, ya = polygon[i]
+        xb, yb = polygon[(i + 1) % n]
+        dist = point_segment_distance(xs[:, None], ys[None, :], xa, ya, xb, yb)
+        dist = np.clip(dist / distance, 0, 1)
+        distances.append(dist)
+
+    # Paste on the canvas
+    thresholds = 1 - np.min(distances, axis=0).T
+    thresholds = np.maximum(thresholds, canvas[ymin:ymax, xmin:xmax])
+    canvas[ymin:ymax, xmin:xmax] = thresholds
     return canvas
+
+
+def point_segment_distance(
+    x: np.ndarray, y: np.ndarray, xa: float, ya: float, xb: float, yb: float
+):
+    # M is the point where we want to compute distance from
+    # AB is the segment
+    MA2 = np.square(x - xa) + np.square(y - ya)
+    MB2 = np.square(x - xb) + np.square(y - yb)
+    AB2 = np.square(xa - xb) + np.square(ya - yb)
+
+    # Cos of AMB = cos
+    # c = sqrt(a^2 + b^2 - ab cos(α))
+    cos = (MA2 + MB2 - AB2) / (2 * np.sqrt(MA2 * MB2) + 1e-7)
+
+    # T is the extension of MB so that ATB is square
+    # S_MAB = AT * MB / 2= AB * MH / 2
+    # and AT = sin(alpha) * AM
+    # therefore MA * MB * sin(π - AMB) = AB * MH
+    # and MH = MA * MB * sin(π - AMB) / AB
+    sin2 = 1 - np.square(cos)
+    sin2 = np.nan_to_num(sin2)
+    dists = np.sqrt(MA2 * MB2 * sin2 / AB2)
+
+    # Cos > 0 means that this AMB is acute
+    # therefore the distance should be the height of the triangle from M
+    cos_mask = cos >= 0
+    dists[cos_mask] = np.sqrt(np.minimum(MA2, MB2)[cos_mask])
+    return dists
