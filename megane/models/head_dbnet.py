@@ -1,27 +1,19 @@
 # Reference: https://arxiv.org/abs/1911.08947
 from dataclasses import dataclass
+from functools import cached_property
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
-import torch
 import simpoly
-from typing import Optional, Tuple, List
-from functools import cached_property
-from math import sqrt
-
-from torch import nn
+import torch
+from torch import Tensor, nn
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
 
-from lenses import bind
 from megane import utils
 from megane.data import Sample
-from megane.models.api import ModelAPI
-from megane.models.head_rrm import HeadWithRRM, ResidualRefinementModule
-from megane.models import losses as L
 from megane.debug import with_timer
-
-
 from megane.registry import heads, target_decoders, target_encoders
 
 
@@ -102,15 +94,12 @@ def encode_dbnet(
     proba_maps = np.zeros((num_classes, H, W), dtype="float32")
     threshold_maps = np.zeros((num_classes, H, W), dtype="float32")
 
-    boxes = [[(x * W, y * H) for (x, y) in box] for box in boxes]
-
     # Negative sample
     if len(classes) == 0:
         return proba_maps, threshold_maps
 
-    max_size = max(H, W) * 2
     for xy, cls in zip(boxes, classes):
-        box = xy
+        box = simpoly.scale_to(xy, W, H)
 
         # Fixed distance or dynamic
         if fixed_dist is None:
@@ -230,7 +219,7 @@ def with_background(x, dim=-3, logit=False):
 
 
 class PredictionConv(nn.Module):
-    def __init__(self, hidden_size: int, num_classes: int, refine: str = None):
+    def __init__(self, hidden_size: int, num_classes: int):
         super().__init__()
         aux_size = hidden_size // 4
         self.conv_1 = nn.Sequential(
@@ -255,48 +244,21 @@ class PredictionConv(nn.Module):
             kernel_size=2,
             stride=2,
         )
-        if refine == "rrm":
-            self.refine = ResidualRefinementModule(num_classes)
-        elif refine == "fast":
-            self.refine = nn.Sequential(
-                nn.Conv2d(num_classes, num_classes, 21, padding=21 // 2),
-                nn.ReLU(),
-            )
-        else:
-            self.refine = None
-
-        # self.proj = nn.Conv2d(hidden_size, aux_size, 1)
-        # self.up = nn.Upsample(scale_factor=2)
 
     def forward(self, x):
         x = self.conv_1(x)
         x = self.conv_2(x)
         x = self.conv_3(x)
-        if self.refine is not None:
-            x = self.refine(x) + x
         return x
 
 
 @heads.register("dbnet")
-class DBNet(ModelAPI):
-    def __init__(
-        self,
-        hidden_size: int,
-        num_classes: int,
-        shrink_rate: float = 0.4,
-        expand_rate: float = 1.5,
-        shrink: bool = True,
-        resize_mode: str = "resize",
-        fixed_dist: float = None,
-        refine: str = None,
-    ):
+class DBNet(nn.Module):
+    def __init__(self, hidden_size: int, num_classes: int):
         super().__init__()
-        utils.save_args()
-
-        # 0 = background
-        self.probas = PredictionConv(hidden_size, num_classes, refine=refine)
-        # 0 = threshold
-        self.thresholds = PredictionConv(hidden_size, num_classes, refine=refine)
+        self.num_classes = num_classes
+        self.probas = PredictionConv(hidden_size, num_classes)
+        self.thresholds = PredictionConv(hidden_size, num_classes)
 
     def forward(self, features, targets=None):
         probas = self.probas(features)
@@ -304,51 +266,63 @@ class DBNet(ModelAPI):
             return probas
         else:
             thresholds = self.thresholds(features)
-        return (probas, thresholds)
+            return (probas, thresholds)
 
-    def db(self, P, T, k=50, logits=True):
-        x = k * (P - T)
-        if logits:
-            return torch.sigmoid(x)
-        else:
-            return x
+    @staticmethod
+    def binarize(proba: Tensor, threshold: Tensor, k: int = 50) -> Tensor:
+        binmap = k * (proba - threshold)
+        return torch.sigmoid(binmap)
+
+    @staticmethod
+    def compute_loss_single(
+        pr_proba: Tensor,
+        pr_threshold: Tensor,
+        pr_bin: Tensor,
+        gt_proba: Tensor,
+        gt_threshold: Tensor,
+        proba_scale: float = 5,
+        bin_scale: float = 1,
+        threshold_scale: float = 10,
+    ) -> Tensor:
+        # Probamap loss
+        p_losses = F.binary_cross_entropy_with_logits(
+            pr_proba,
+            gt_proba,
+            reduction="none",
+        )
+        p_loss = compute_loss_mining(p_losses, gt_proba > 0)
+
+        # Binary map loss
+        b = p_losses.max()
+        a = p_losses.min()
+        weights = (p_losses - a) / (b - a) + 1
+        b_loss = dice_loss(pr_bin, gt_proba, weights=weights)
+
+        # Threshold map loss
+        t_loss = F.l1_loss(torch.sigmoid(pr_threshold), gt_threshold)
+
+        loss = proba_scale * p_loss + b_loss * bin_scale + t_loss * threshold_scale
+        return loss
 
     def compute_loss(self, outputs, targets):
         pr_probas, pr_thresholds = outputs
         gt_probas, gt_thresholds = targets
+        pr_bins = self.binarize(pr_probas, pr_thresholds)
 
+        N, C = gt_probas.shape[:2]
+
+        # Compute loss per sample and classes
         loss = 0
-        count = 0
-        for i in range(self.num_classes):
-            # Prepare
-            pr_proba = pr_probas[:, i]
-            pr_threshold = pr_thresholds[:, i]
-            gt_proba = gt_probas[:, i]
-            gt_threshold = gt_thresholds[:, i]
-            # DB map loss
-
-            # Training mask is needed because the surrounding will be 0.5
-            pr_bin = self.db(pr_proba, pr_threshold, logits=True)
-            gt_bin = self.db(gt_proba, gt_threshold, logits=True)
-            training_mask = (gt_proba + gt_threshold) > 0
-            pr = pr_bin[training_mask]
-            gt = gt_bin[training_mask]
-            loss += F.binary_cross_entropy_with_logits(pr, gt)
-
-            # Proba map loss
-            pr = torch.sigmoid(pr_proba).unsqueeze(0)
-            gt = gt_proba.unsqueeze(0)
-            loss += F.binary_cross_entropy_with_logits(pr, gt)
-
-            # Threshold map loss
-            pr = pr_threshold
-            gt = gt_threshold
-            losses = F.l1_loss(torch.sigmoid(pr), gt)
-            loss += losses * 10
-
-            count = count + 1
-
-        loss = loss / count
+        # for b_idx in range(N):
+        #     for c_idx in range(C):
+        loss = self.compute_loss_single(
+            pr_probas,
+            pr_thresholds,
+            pr_bins,
+            gt_probas,
+            gt_thresholds,
+        )
+        # loss = loss / N / C
         return loss
 
     def post_process(self, probas):
@@ -383,6 +357,8 @@ def draw_threshold(
     # Polygon bounding rects
     xmin, ymin = np.min(outer_polygon, axis=0)
     xmax, ymax = np.max(outer_polygon, axis=0)
+
+    # Squeeze to int and limit to the canvas
     xmin = max(0, int(round(xmin)))
     xmax = min(W, int(round(xmax)))
     ymin = max(0, int(round(ymin)))
@@ -401,14 +377,23 @@ def draw_threshold(
         distances.append(dist)
 
     # Paste on the canvas
-    thresholds = 1 - np.min(distances, axis=0).T
-    thresholds = np.maximum(thresholds, canvas[ymin:ymax, xmin:xmax])
-    canvas[ymin:ymax, xmin:xmax] = thresholds
+    try:
+        thresholds = 1 - np.min(distances, axis=0).T
+        thresholds = np.maximum(thresholds, canvas[ymin:ymax, xmin:xmax])
+        canvas[ymin:ymax, xmin:xmax] = thresholds
+    except ValueError as e:
+        print("xyxy", xmin, xmax, ymin, ymax)
+        raise e
     return canvas
 
 
 def point_segment_distance(
-    x: np.ndarray, y: np.ndarray, xa: float, ya: float, xb: float, yb: float
+    x: np.ndarray,
+    y: np.ndarray,
+    xa: float,
+    ya: float,
+    xb: float,
+    yb: float,
 ):
     # M is the point where we want to compute distance from
     # AB is the segment
@@ -418,13 +403,13 @@ def point_segment_distance(
 
     # Cos of AMB = cos
     # c = sqrt(a^2 + b^2 - ab cos(α))
-    cos = (MA2 + MB2 - AB2) / (2 * np.sqrt(MA2 * MB2) + 1e-7)
+    cos = (MA2 + MB2 - AB2) / (2 * np.sqrt(MA2 * MB2) + 1e-6)
 
     # T is the extension of MB so that ATB is square
     # S_MAB = AT * MB / 2= AB * MH / 2
     # and AT = sin(alpha) * AM
     # therefore MA * MB * sin(π - AMB) = AB * MH
-    # and MH = MA * MB * sin(π - AMB) / AB
+    # and MH = MA * MB * sin(π - AMB) / AB2
     sin2 = 1 - np.square(cos)
     sin2 = np.nan_to_num(sin2)
     dists = np.sqrt(MA2 * MB2 * sin2 / AB2)
@@ -434,3 +419,54 @@ def point_segment_distance(
     cos_mask = cos >= 0
     dists[cos_mask] = np.sqrt(np.minimum(MA2, MB2)[cos_mask])
     return dists
+
+
+def dice_loss(
+    pr: Tensor,
+    gt: Tensor,
+    reduction: str = "mean",
+    weights: Optional[Tensor] = None,
+):
+    # Apply weights if any
+    if weights is None:
+        inter = pr * gt
+    else:
+        inter = pr * gt * weights
+    union = (pr + gt).clamp(0, 1)
+    losses = 1 - (2 * inter) / (union + 1e-12)
+
+    # Reduce and return
+    if reduction == "mean":
+        return losses.mean()
+    elif reduction == "none":
+        return losses
+    elif reduction == "sum":
+        return losses.sum()
+    else:
+        raise NotImplementedError(f"Unknown reduction {reduction}")
+
+
+def compute_loss_mining(
+    losses: Tensor,
+    pos: Tensor,
+    neg: Optional[Tensor] = None,
+    k: int = 3,
+):
+    # Negative mask,
+    # you can optionally passed it to this function to reduce computation
+    if neg is None:
+        neg = ~pos
+
+    # Counting
+    num_pos = torch.count_nonzero(pos)
+    num_neg = torch.min(num_pos * k, torch.count_nonzero(neg))
+
+    # Postive and negative losses
+    pos_losses = torch.topk(losses[pos], k=num_pos).values
+    neg_losses = torch.topk(losses[neg], k=num_neg).values
+    pos_loss = pos_losses.sum()
+    neg_loss = neg_losses.sum()
+
+    # Reduction
+    loss = (pos_loss + neg_loss) / (num_pos + num_neg + 1e-6)
+    return loss
