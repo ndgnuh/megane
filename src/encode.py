@@ -90,10 +90,10 @@ def encode_fcos(
     for stride in strides:
         ft_width = int(W // stride)
         ft_height = int(H // stride)
-        centerness_maps.append(np.zeros((1, ft_height, ft_width), dtype="float32"))
-        regression_maps.append(np.zeros((4, ft_height, ft_width), dtype="float32"))
+        centerness_maps.append(np.zeros((C, ft_height, ft_width), dtype="float32"))
+        regression_maps.append(np.zeros((C, 4, ft_height, ft_width), dtype="float32"))
         classification_maps.append(np.zeros((C, ft_height, ft_width), dtype="float32"))
-        training_maps.append(np.zeros((ft_height, ft_width), dtype="bool"))
+        training_maps.append(np.zeros((C, ft_height, ft_width), dtype="bool"))
 
     # Denormalize bboxes
     boxes = [
@@ -123,13 +123,14 @@ def encode_fcos(
             max_regression_thresholds_1,
             max_regression_thresholds_2,
         ):
-            if m1 < max_regression_value and max_regression_value <= m2:
-                stride = s
-                idx = i
-                break
+            if max_regression_value >= m2 and max_regression_value < m1:
+                continue
+            stride = s
+            idx = i
+            break
 
         # metrics
-        _, ft_height, ft_width = regression_maps[idx].shape
+        _, _, ft_height, ft_width = regression_maps[idx].shape
         x1_ = int(x1 / stride + 0.5)
         x2_ = int(x2 / stride + 0.5)
         y1_ = int(y1 / stride + 0.5)
@@ -165,13 +166,13 @@ def encode_fcos(
         y2_ = min(y2_, ft_height)
         c_pos = [slice(y1_, y2_), slice(x1_, x2_)]  # position on canvas
         t_pos = [slice(0, y2_ - y1_), slice(0, x2_ - x1_)]  # brush trim position
-        centerness_maps[idx][:, *c_pos] = np.fmax(
-            centerness_maps[idx][:, *c_pos],
+        centerness_maps[idx][c, *c_pos] = np.fmax(
+            centerness_maps[idx][c, *c_pos],
             ctn[*t_pos],
         )
-        regression_maps[idx][:, *c_pos] = reg[:, *t_pos]
+        regression_maps[idx][c, :, *c_pos] = reg[:, *t_pos]
         classification_maps[idx][c, *c_pos] = 1
-        training_maps[idx][*c_pos] = True
+        training_maps[idx][c, *c_pos] = True
 
     # Convert image to tensor
     image = image.resize((W, H), Image.Resampling.LANCZOS).convert("RGB")
@@ -241,15 +242,17 @@ def decode_fcos(
         strides,
     ):
         # Decode each class
-        for class_id, cls_map_c in enumerate(cls_map):
-            score_map = ctn_map[0] * cls_map_c
+        for class_id, cls_map_c, rgs_map_c, ctn_map_c in zip(
+            count(), cls_map, rgs_map, ctn_map
+        ):
+            score_map = ctn_map_c * cls_map_c
             y, x = np.where(cls_map_c >= 0.5)
             scores_ = score_map[y, x]
 
             # Unpack regression map
             # l = (xs - x1) / stride -> x1 = xs - l * stride
             # r = (x2 - xs) / stride -> x2 = xs + r * stride
-            l, t, r, b = rgs_map
+            l, t, r, b = rgs_map_c
             xs = x * stride + math.floor(stride / 2)
             ys = y * stride + math.floor(stride / 2)
             x1 = xs - l[y, x] * stride

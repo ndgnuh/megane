@@ -81,8 +81,8 @@ class FCOSHead(nn.Module):
             ConvBR(hidden_size, hidden_size, 3, padding=1),
             ConvBR(hidden_size, hidden_size, 3, padding=1),
         )
-        self.regression = nn.Conv2d(hidden_size, 4, 3, padding=1)
-        self.centerness = nn.Conv2d(hidden_size, 1, 3, padding=1)
+        self.regression = nn.Conv2d(hidden_size, 4 * num_classes, 3, padding=1)
+        self.centerness = nn.Conv2d(hidden_size, num_classes, 3, padding=1)
         self.classification = nn.Sequential(
             ConvBR(hidden_size, hidden_size, 3, padding=1),
             ConvBR(hidden_size, hidden_size, 3, padding=1),
@@ -91,6 +91,7 @@ class FCOSHead(nn.Module):
             nn.Conv2d(hidden_size, num_classes, 3, padding=1),
         )
         self.stride = stride
+        self.num_classes = num_classes
 
     def lazy_grid(self, ft_map):
         if not hasattr(self, "grid"):
@@ -114,7 +115,7 @@ class FCOSHead(nn.Module):
 
         # Original paper
         reg = torch.relu(reg)
-
+        reg = reg.reshape(reg.size(0), self.num_classes, 4, reg.size(2), reg.size(3))
         # Instead, add the position so we regress the changes
         # Note: Negative position got boosted too...
         # l, t, r, b = reg.unbind(dim=1)
@@ -208,6 +209,7 @@ class FCOS(LightningModule):
                 nn.init.normal_(layer.weight, std=0.01)
                 if hasattr(layer, "bias"):
                     nn.init.constant_(layer.bias, 0)
+        self.num_classes = num_classes
 
     def forward(self, x):
         # Take c3, c4 and c5
@@ -250,8 +252,6 @@ class FCOS(LightningModule):
         ):
             # loss = sigmoid_focal_loss(pr, gt).mean()
 
-            pos = pos.unsqueeze(1)
-            pos = pos.repeat((1, gt.size(1), 1, 1))
             neg = ~pos
             loss = 0
             if torch.count_nonzero(pos) > 0:
@@ -273,23 +273,30 @@ class FCOS(LightningModule):
             # else:
             #     pr = pr.permute(0, 2, 3, 1).flatten(0, 2)
             #     gt = gt.permute(0, 2, 3, 1).flatten(0, 2)
-            if torch.count_nonzero(pos) == 0:
-                continue
-            loss = iou_loss(pr, gt)
-            loss = loss[pos].mean()
-            rgs_losses.append(loss)
+
+            # Merge NC4HW -> (NC) 4 H W
+            loss = 0
+            for i in range(self.num_classes):
+                pos_c = pos[:, i]
+                pr_c = pr[:, i]
+                gt_c = gt[:, i]
+                if torch.count_nonzero(pos_c) == 0:
+                    loss += F.l1_loss(pr_c, gt_c) * 0.25
+                else:
+                    loss += iou_loss(pr_c, gt_c)[pos_c].mean()
+
+            if loss > 0:
+                rgs_losses.append(loss)
 
         for pr, gt, pos in zip(centerness_maps, gt_centerness_maps, training_maps):
-            loss = F.binary_cross_entropy_with_logits(pr, gt)
+            # loss = F.binary_cross_entropy_with_logits(pr, gt)
 
-            # pos = pos.unsqueeze(1)
-            # pos = pos.repeat((1, gt.size(1), 1, 1))
-            # neg = ~pos
-            # loss = 0
-            # if torch.count_nonzero(pos) > 0:
-            #     loss += F.binary_cross_entropy_with_logits(pr[pos], gt[pos])
-            # if torch.count_nonzero(neg) > 0:
-            #     loss += F.binary_cross_entropy_with_logits(pr[neg], gt[neg])
+            neg = ~pos
+            loss = 0
+            if torch.count_nonzero(pos) > 0:
+                loss += F.binary_cross_entropy_with_logits(pr[pos], gt[pos])
+            if torch.count_nonzero(neg) > 0:
+                loss += F.binary_cross_entropy_with_logits(pr[neg], gt[neg])
             ctn_losses.append(loss)
 
         # losses = [
