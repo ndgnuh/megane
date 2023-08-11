@@ -112,9 +112,12 @@ def encode_fcos(
     for (x1, y1, x2, y2), c in zip(boxes, classes):
         w = x2 - x1
         h = y2 - y1
+        if w <= 0 or h <= 0:
+            continue
 
         # Select level
-        max_regression_value = max(w, h)
+        # Use this instead of max to negate the extreme aspect ratio
+        max_regression_value = math.sqrt(w * h)
         idx = 0
         stride = strides[0]
         for i, s, m1, m2 in zip(
@@ -134,6 +137,8 @@ def encode_fcos(
         x2_ = int(x2 / stride + 0.5)
         y1_ = int(y1 / stride + 0.5)
         y2_ = int(y2 / stride + 0.5)
+        if x1_ >= x2_ or y1_ >= y2_:
+            continue
         w_ = x2_ - x1_
         h_ = y2_ - y1_
 
