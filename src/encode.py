@@ -107,8 +107,9 @@ def encode_fcos(
     ]
 
     # Draw targets
-    max_regression_thresholds_1 = [-1] + max_regression_thresholds[-1:]
+    max_regression_thresholds_1 = [-1] + max_regression_thresholds[:-1]
     max_regression_thresholds_2 = max_regression_thresholds
+    print(max_regression_thresholds_1, max_regression_thresholds_2)
     for (x1, y1, x2, y2), c in zip(boxes, classes):
         w = x2 - x1
         h = y2 - y1
@@ -123,11 +124,11 @@ def encode_fcos(
             max_regression_thresholds_1,
             max_regression_thresholds_2,
         ):
-            if max_regression_value >= m2 and max_regression_value < m1:
-                continue
-            stride = s
-            idx = i
-            break
+            print(max_regression_value, m1, m2)
+            if m1 < max_regression_value and max_regression_value <= m2:
+                stride = s
+                idx = i
+                break
 
         # metrics
         _, _, ft_height, ft_width = regression_maps[idx].shape
