@@ -12,8 +12,12 @@ class ConvBR(nn.Sequential):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.conv = nn.Conv2d(*args, **kwargs)
-        self.norm = nn.BatchNorm2d(self.conv.out_channels)
-        self.relu = nn.ReLU()
+        self.norm = nn.InstanceNorm2d(
+            self.conv.out_channels,
+            track_running_stats=True,
+            affine=True,
+        )
+        self.relu = nn.ReLU(True)
 
     def __repr__(self):
         return repr(self.conv).replace("Conv2d", "ConvBatchNormReLU")
@@ -116,16 +120,6 @@ class FCOSHead(nn.Module):
         # Original paper
         reg = torch.relu(reg)
         reg = reg.reshape(reg.size(0), self.num_classes, 4, reg.size(2), reg.size(3))
-        # Instead, add the position so we regress the changes
-        # Note: Negative position got boosted too...
-        # l, t, r, b = reg.unbind(dim=1)
-        # y, x = self.lazy_grid(ft_map)
-        # l = l + x
-        # r = r + x
-        # t = t + y
-        # b = b + y
-        # # ic(l.shape)
-        # reg = torch.stack([l, t, r, b], dim=1)
         return reg, ctn, cls
 
 
@@ -319,12 +313,16 @@ class FCOS(LightningModule):
             momentum=0.9,
         )
         my_lr_scheduler = lr_scheduler.MultiStepLR(
-            optimizer, milestones=[500, 5000, 10000], gamma=0.1
+            optimizer,
+            milestones=[500, 5000, 10000, 20000, 40000],
+            gamma=0.1,
         )
         return {
             "optimizer": optimizer,
-            "lr_scheduler": my_lr_scheduler,
-            "interval": "step",
+            "lr_scheduler": {
+                "scheduler": my_lr_scheduler,
+                "interval": "step",
+            },
         }
 
     def on_train_epoch_end(self):
