@@ -272,15 +272,8 @@ def decode_fcos(
 
             # Ignore low score boxes
             mask = scores_ > min_score
-            boxes_ = boxes_[mask]
-            scores_ = scores_[mask]
-
-            # NMS
-            boxes_ = torch.tensor(boxes_.astype("float32"))
-            scores_ = torch.tensor(scores_.astype("float32"))
-            keep_ = ops.nms(boxes_, scores_, iou_threshold=nms_threshold)
-            boxes_ = boxes_[keep_].tolist()
-            scores_ = scores_[keep_].tolist()
+            boxes_ = boxes_[mask].astype("float32")
+            scores_ = scores_[mask].astype("float32")
 
             # Descale boxes
             H, W = cls_map_c.shape
@@ -292,6 +285,16 @@ def decode_fcos(
             boxes.extend(boxes_)
             classes.extend([class_id] * len(boxes_))
             scores.extend(scores_)
+
+    # NMS
+    if len(boxes) > 0:
+        boxes = torch.tensor(boxes).type(torch.float32)
+        scores = torch.tensor(scores).type(torch.float32)
+        classes = torch.tensor(classes)
+        keep = ops.nms(boxes, scores, iou_threshold=nms_threshold)
+        boxes = boxes[keep].tolist()
+        scores = scores[keep].tolist()
+        classes = classes[keep].tolist()
 
     return boxes, classes, scores
 
